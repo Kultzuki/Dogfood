@@ -1,0 +1,65 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="auth-split">
+  <div class="card card--page">
+    <div class="card__header">
+      <h1 class="card__title">Sign In</h1>
+    </div>
+
+    {% if error %}
+    <div class="alert alert--error" role="alert">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form class="form" method="post" action="/login">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+      <div class="form__group">
+        <label class="form__label" for="email">Email address</label>
+        <input
+          class="form__input"
+          type="email"
+          id="email"
+          name="email"
+          required
+          autocomplete="email"
+          placeholder="you@example.com"
+        >
+      </div>
+
+      <div class="form__group">
+        <label class="form__label" for="password">Password</label>
+        <input
+          class="form__input"
+          type="password"
+          id="password"
+          name="password"
+          required
+          autocomplete="current-password"
+          placeholder="Password"
+        >
+      </div>
+
+      <div class="form__actions">
+        <button class="button button--primary" type="submit">Sign In</button>
+      </div>
+    </form>
+
+    <div class="card__footer">
+      <p class="form__link">No account yet? <a href="/register">Create one</a></p>
+    </div>
+  </div>
+
+  <aside class="auth-side" aria-label="About Dogfood">
+    <p class="auth-side__title">Ship your hackathon, end to end.</p>
+    <p class="auth-side__text">Dogfood covers registration, teams, submissions, judging, and results — self-hosted, with competition integrity built in.</p>
+    <ul class="auth-side__list">
+      <li>Submit and track projects per event</li>
+      <li>Fair, rubric-based judge scoring</li>
+      <li>Browse the public project gallery</li>
+    </ul>
+  </aside>
+</div>
+{% endblock %}

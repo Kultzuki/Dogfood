@@ -1,0 +1,17 @@
+inputHash: 9ccbba147d9332b0e4ad7a76a40c763523c0a0f83f9848dde56f1b0f62d10668
+inputEntries: 224
+excludedProjects: p39,p40
+hashConsistent: yes
+run method=zscore-global excluded=p39,p40 inputHash=9ccbba147d9332b0e4ad7a76a40c763523c0a0f83f9848dde56f1b0f62d10668 inputMean=52.7369 inputStd=11.3815 outputMean=52.7369 outputStd=11.3815 projects=38
+run method=centering excluded=p39,p40 inputHash=9ccbba147d9332b0e4ad7a76a40c763523c0a0f83f9848dde56f1b0f62d10668 inputMean=52.5161 inputStd=10.0952 outputMean=52.5161 outputStd=10.0952 projects=38
+run method=raw-mean excluded=p39,p40 inputHash=9ccbba147d9332b0e4ad7a76a40c763523c0a0f83f9848dde56f1b0f62d10668 inputMean=52.9320 inputStd=11.3406 outputMean=52.9320 outputStd=11.3406 projects=38
+run method=median-mad excluded=p39,p40 inputHash=9ccbba147d9332b0e4ad7a76a40c763523c0a0f83f9848dde56f1b0f62d10668 inputMean=51.7632 inputStd=16.8920 outputMean=51.7632 outputStd=16.8920 projects=38
+vsBaseline method=zscore-global moved=37 up=16 down=21 same=1 top10Overlap=6
+vsBaseline method=centering moved=36 up=19 down=17 same=2 top10Overlap=5
+vsBaseline method=raw-mean moved=0 up=0 down=0 same=38 top10Overlap=10
+vsBaseline method=median-mad moved=36 up=20 down=16 same=2 top10Overlap=6
+truthEntries: 240
+vsTruth method=zscore-global spearman=0.9672 top10Recovery=8
+vsTruth method=centering spearman=0.9715 top10Recovery=8
+vsTruth method=raw-mean spearman=0.9518 top10Recovery=7
+vsTruth method=median-mad spearman=0.9407 top10Recovery=7

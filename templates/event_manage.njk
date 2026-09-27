@@ -1,0 +1,144 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">{{ event.name }}</h1>
+    <p class="text-muted text-center">State: {{ event.state }} · Version: {{ event.version }}</p>
+  </div>
+
+  {% if error %}
+  <div class="alert alert--error" role="alert">{{ error }}</div>
+  {% endif %}
+  {% if flash %}
+  <div class="alert alert--{{ flash.kind }}" role="status">{{ flash.message }}</div>
+  {% endif %}
+
+  <div class="card__body">
+    <h2>State pipeline</h2>
+    <p class="detail-meta" aria-label="Event lifecycle">
+      {% for s in states %}
+      {% if s == event.state %}
+      <span class="badge badge--scored" aria-current="step">{{ s }}</span>
+      {% else %}
+      <span class="badge">{{ s }}</span>
+      {% endif %}
+      {% endfor %}
+    </p>
+    <p class="form__help mt-2">Current state: {{ event.state }} · optimistic-locking version {{ event.version }}.</p>
+    {% if next and next.length > 0 %}
+    <div class="flex gap-2 mt-2">
+      {% for to in next %}
+      <form class="form form--flush" method="post" action="/events/{{ event.id }}/manage">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="action" value="transition">
+        <input type="hidden" name="toState" value="{{ to }}">
+        <input type="hidden" name="expectedVersion" value="{{ event.version }}">
+        <button class="button button--primary button--sm" type="submit">Move to {{ to }}</button>
+      </form>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted mt-2">Terminal state — no further transitions.</p>
+    {% endif %}
+  </div>
+
+  <div class="card__body">
+    <h2>Tracks</h2>
+    {% if tracks and tracks.length > 0 %}
+    <ul class="flex flex-col gap-2">
+      {% for t in tracks %}
+      <li class="flex justify-between items-center gap-2">
+        <span>{{ t.slug }} — {{ t.name }}</span>
+        <form class="form--flush" method="post" action="/events/{{ event.id }}/manage">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="action" value="track_delete">
+          <input type="hidden" name="id" value="{{ t.id }}">
+          <button class="button button--danger button--sm" type="submit">Delete</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted">No tracks yet.</p>
+    {% endif %}
+    <form class="form form--flush-x" method="post" action="/events/{{ event.id }}/manage">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="action" value="track_add">
+      <div class="form__group">
+        <label class="form__label" for="track-slug">Slug</label>
+        <input class="form__input" type="text" id="track-slug" name="slug" required autocomplete="off" placeholder="web">
+        <span class="form__help">Lowercase letters, digits, dashes (max 100).</span>
+      </div>
+      <div class="form__group">
+        <label class="form__label" for="track-name">Name</label>
+        <input class="form__input" type="text" id="track-name" name="name" required autocomplete="off" placeholder="Web">
+      </div>
+      <div class="form__actions">
+        <button class="button button--secondary button--sm" type="submit">Add track</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card__body">
+    <h2>Prizes</h2>
+    {% if prizes and prizes.length > 0 %}
+    <ul class="flex flex-col gap-2">
+      {% for p in prizes %}
+      <li class="flex justify-between items-center gap-2">
+        <span>{{ p.slug }} — {{ p.name }}{% if p.amount_cents %} · {{ p.amount_cents }} cents{% endif %}</span>
+        <form class="form--flush" method="post" action="/events/{{ event.id }}/manage">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="action" value="prize_delete">
+          <input type="hidden" name="id" value="{{ p.id }}">
+          <button class="button button--danger button--sm" type="submit">Delete</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted">No prizes yet.</p>
+    {% endif %}
+    <form class="form form--flush-x" method="post" action="/events/{{ event.id }}/manage">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="action" value="prize_add">
+      <div class="form__group">
+        <label class="form__label" for="prize-slug">Slug</label>
+        <input class="form__input" type="text" id="prize-slug" name="slug" required autocomplete="off" placeholder="grand">
+      </div>
+      <div class="form__group">
+        <label class="form__label" for="prize-name">Name</label>
+        <input class="form__input" type="text" id="prize-name" name="name" required autocomplete="off" placeholder="Grand prize">
+      </div>
+      <div class="form__group">
+        <label class="form__label" for="prize-amount">Amount (cents, optional)</label>
+        <input class="form__input" type="number" id="prize-amount" name="amountCents" min="0" step="1" autocomplete="off" placeholder="50000">
+      </div>
+      <div class="form__group">
+        <label class="form__label" for="prize-track">Track ID (optional)</label>
+        <input class="form__input" type="text" id="prize-track" name="trackId" autocomplete="off" placeholder="Leave blank for event-wide">
+      </div>
+      <div class="form__actions">
+        <button class="button button--secondary button--sm" type="submit">Add prize</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card__body">
+    <h2>Submission deadline</h2>
+    <p class="text-muted">Current: {% if event.submissions_close_at %}{{ event.submissions_close_at }}{% else %}open indefinitely{% endif %}. Enforced on server time.</p>
+    <form class="form form--flush-x" method="post" action="/events/{{ event.id }}/manage">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="action" value="deadline">
+      <div class="form__group">
+        <label class="form__label" for="deadline">Closes at</label>
+        <input class="form__input" type="datetime-local" id="deadline" name="submissions_close_at" value="{{ event.submissions_close_at }}">
+        <span class="form__help">Blank clears the deadline.</span>
+      </div>
+      <div class="form__actions">
+        <button class="button button--secondary button--sm" type="submit">Set deadline</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

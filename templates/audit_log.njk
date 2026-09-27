@@ -1,0 +1,56 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">Audit Log</h1>
+    <p class="text-muted text-center">{{ event.name }} · latest {{ total }} entries (capped at 200)</p>
+  </div>
+
+  <div class="card__body">
+    {% if chain.ok %}
+    <div class="alert alert--success" role="status">Hash chain intact — {{ total }} entries verified.</div>
+    {% else %}
+    <div class="alert alert--error" role="alert">Hash chain broken at seq {{ chain.badSeq }}.</div>
+    {% endif %}
+    <p class="text-muted mt-2">Showing page {{ page }} of {{ pages }} (50 per page). Use ?page=N to page through the latest 200 entries.</p>
+  </div>
+
+  <div class="card__body">
+    {% if rows and rows.length > 0 %}
+    <div class="table-wrapper">
+      <table class="table">
+        <thead class="table__head">
+          <tr class="table__row">
+            <th class="table__header-cell" scope="col">Seq</th>
+            <th class="table__header-cell" scope="col">Action</th>
+            <th class="table__header-cell" scope="col">Resource</th>
+            <th class="table__header-cell" scope="col">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="table__row">
+            <td class="table__cell">#{{ r.seq }}</td>
+            <td class="table__cell">{{ r.action }}</td>
+            <td class="table__cell">{{ r.resource_type }}/{{ r.resource_id }}</td>
+            <td class="table__cell">{{ r.created_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="flex gap-2 mt-4">
+      {% if page > 1 %}
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/audit-viewer?page={{ page - 1 }}">Previous</a>
+      {% endif %}
+      {% if page < pages %}
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/audit-viewer?page={{ page + 1 }}">Next</a>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="text-muted">No audit entries for this event.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

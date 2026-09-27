@@ -1,0 +1,121 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">Judging Progress</h1>
+    <p class="text-muted text-center">{{ event.name }} · coverage target k={{ k }} reviews per project</p>
+  </div>
+
+  <div class="card__body">
+    <h2>Judges</h2>
+    {% if judges and judges.length > 0 %}
+    <ul class="flex flex-col gap-4 mt-2">
+      {% for j in judges %}
+      <li>
+        <div class="flex justify-between items-center gap-2">
+          <span>{{ j.email }}</span>
+          <span class="text-muted">assigned {{ j.assigned }} · done {{ j.done }} · pending {{ j.pending }} · {{ j.pct }}%</span>
+        </div>
+        <div class="progress-bar mt-2" role="progressbar" aria-valuenow="{{ j.done }}" aria-valuemin="0" aria-valuemax="{{ j.assigned }}" aria-label="Progress for {{ j.email }}">
+          <span class="progress-bar__fill" style="width: {{ j.pct }}%;"></span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state__title">No judges assigned to this event.</p>
+      <p class="empty-state__text">Assign judges via the Data Hub import below, then return here to track completion.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card__body">
+    <h2>Project coverage</h2>
+    {% if coverage and coverage.length > 0 %}
+    <ul class="flex flex-col gap-4 mt-2">
+      {% for c in coverage %}
+      <li>
+        <div class="flex justify-between items-center gap-2">
+          <span>{{ c.title }}</span>
+          {% if c.warn %}
+          <span class="badge badge--pending">{{ c.n }}/{{ k }} — needs reviews</span>
+          {% else %}
+          <span class="badge badge--submitted">{{ c.n }}/{{ k }} covered</span>
+          {% endif %}
+        </div>
+        <div class="progress-bar mt-2" role="progressbar" aria-valuenow="{{ c.n }}" aria-valuemin="0" aria-valuemax="{{ k }}" aria-label="Coverage for {{ c.title }}">
+          <span class="progress-bar__fill" style="width: {% if c.n >= k %}100{% else %}{{ (100 * c.n / k) | round }}{% endif %}%;"></span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted">No projects yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card__body">
+    <h2>Normalization preview</h2>
+    <p class="text-muted">Centering top-10, computed server-side on current scores.</p>
+    <p class="form__help">Method: normalized = raw − judge mean + global mean. Removes harsh/generous rater offsets without rescaling spread. See JUDGING.md for the full adjudication.</p>
+    <form class="form form--flush" method="get" action="/events/{{ event.id }}/judging-progress">
+      <input type="hidden" name="preview" value="1">
+      <div class="form__actions form__actions--start">
+        <button class="button button--secondary button--sm" type="submit">Show preview</button>
+      </div>
+    </form>
+    {% if preview %}
+      {% if preview.length > 0 %}
+      <div class="table-wrapper mt-2">
+        <table class="table">
+          <thead class="table__head">
+            <tr class="table__row">
+              <th class="table__header-cell" scope="col">Rank</th>
+              <th class="table__header-cell" scope="col">Project</th>
+              <th class="table__header-cell" scope="col">Normalized</th>
+              <th class="table__header-cell" scope="col">Raw mean</th>
+              <th class="table__header-cell" scope="col">n</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in preview %}
+            <tr class="table__row">
+              <td class="table__cell">#{{ r.rank }}</td>
+              <td class="table__cell">{{ r.projectId }}</td>
+              <td class="table__cell">{{ r.normalized }}</td>
+              <td class="table__cell">{{ r.rawMean }}</td>
+              <td class="table__cell">{{ r.n }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted mt-2">No scorable entries.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="card__body">
+    <h2>Rubric versions</h2>
+    <p class="text-muted">Weights are configured through the rubric API; this page shows how versioning protects past scores.</p>
+    <ul class="flex flex-col gap-2 mt-2">
+      <li class="flex justify-between items-center gap-2">
+        <span>Default (no version published)</span>
+        <span class="badge">Technical 30 · Innovation 25 · Impact 25 · Polish 20</span>
+      </li>
+      <li class="flex justify-between items-center gap-2">
+        <span>Republishing</span>
+        <span class="text-muted">Creates a new version and deactivates the old one in a single transaction — exactly one active version per event.</span>
+      </li>
+      <li class="flex justify-between items-center gap-2">
+        <span>Existing scores</span>
+        <span class="text-muted">Each score pins the active rubric version at submit time, so old scores never change meaning when you republish.</span>
+      </li>
+    </ul>
+    <p class="form__help mt-2">Endpoints: GET /api/events/{{ event.id }}/rubric (active weights) · POST /api/events/{{ event.id }}/rubrics (organizer-only republish).</p>
+  </div>
+</div>
+{% endblock %}

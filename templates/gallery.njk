@@ -1,0 +1,101 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">Project Gallery</h1>
+    <p class="text-muted text-center">Submitted projects from events open for showcase.</p>
+  </div>
+
+  <form class="form" method="get" action="/gallery" role="search">
+    <div class="form__group">
+      <label class="form__label" for="q">Search</label>
+      <input
+        class="form__input"
+        type="search"
+        id="q"
+        name="q"
+        value="{{ q | escape }}"
+        placeholder="Search title, tagline, description, tags"
+        autocomplete="off"
+      >
+    </div>
+
+    <div class="form__group">
+      <label class="form__label" for="track">Track ID</label>
+      <input
+        class="form__input"
+        type="text"
+        id="track"
+        name="track"
+        value="{{ track | escape }}"
+        placeholder="Filter by track"
+        autocomplete="off"
+        aria-describedby="track-hint"
+      >
+      <p class="form__help track-hint" id="track-hint" data-track-hint hidden>That does not look like a valid track ID, so this filter is ignored and all tracks are shown. Clear the field to remove this message.</p>
+    </div>
+
+    <div class="form__group">
+      <label class="form__label" for="tag">Tech tag</label>
+      <input
+        class="form__input"
+        type="text"
+        id="tag"
+        name="tag"
+        value="{{ tag | escape }}"
+        placeholder="Filter by tech tag"
+        autocomplete="off"
+      >
+    </div>
+
+    <div class="form__actions">
+      <button class="button button--primary" type="submit">Search</button>
+      <a class="button button--secondary" href="/gallery">Clear</a>
+    </div>
+  </form>
+
+  <div class="card__body">
+    {% if q or track or tag %}
+    <p class="filter-notice text-muted text-center" role="status">Search or filters applied — <a href="/gallery">clear all filters</a>.</p>
+    {% endif %}
+    {% if dbDown %}
+    <div class="alert alert--warning" role="alert">
+      Gallery is temporarily unavailable. Please try again later.
+    </div>
+    {% elif projects and projects.length > 0 %}
+    <ul class="gallery-grid">
+      {% for p in projects %}
+      <li class="card card--page project-card">
+        <div class="card__header">
+          <h2 class="card__title project-card__title"><a href="/gallery/{{ p.id }}">{{ p.title }}</a></h2>
+          {% if p.tagline %}
+          <p class="text-muted">{{ p.tagline }}</p>
+          {% endif %}
+        </div>
+        <div class="card__body">
+          {% if p.description %}
+          <p>{{ p.description }}</p>
+          {% endif %}
+          {% if p.tech_tags and p.tech_tags.length > 0 %}
+          <ul class="tag-list" aria-label="Tech tags">
+            {% for t in p.tech_tags %}
+            <li class="tag">{{ t }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          <p class="form__help mt-2">{{ p.event_name }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state__title">No submitted projects found.</p>
+      <p class="empty-state__text">Try clearing your search or filters.</p>
+      <p><a class="button button--secondary" href="/gallery">Clear search</a></p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

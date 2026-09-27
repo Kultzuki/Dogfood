@@ -1,0 +1,66 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">Data Hub</h1>
+    <p class="text-muted text-center">{{ event.name }} · exports and validated imports</p>
+  </div>
+
+  {% if error %}
+  <div class="alert alert--error" role="alert">{{ error }}</div>
+  {% endif %}
+  {% if flash %}
+  <div class="alert alert--{{ flash.kind }}" role="status">{{ flash.message }}</div>
+  {% endif %}
+
+  <div class="card__body">
+    <h2>CSV exports</h2>
+    <p class="text-muted">Each button downloads one dataset for this event. Raw tables first, derived tables after.</p>
+    <ul class="flex flex-col gap-4 mt-2">
+      {% for d in datasets %}
+      <li>
+        <p>
+          <a class="button button--secondary button--sm" href="/api/events/{{ event.id }}/export?dataset={{ d }}">Download {{ d }}.csv</a>
+        </p>
+        {% if d == "assignments" %}
+        <p class="form__help">Raw judge assignments: event, project, judge, track, status.</p>
+        {% elif d == "scores-raw" %}
+        <p class="form__help">Raw score rows: every submission including version and whether it is current.</p>
+        {% elif d == "scores-normalized" %}
+        <p class="form__help">Derived, centering method: project, normalized score, raw mean, review count, rank.</p>
+        {% elif d == "rankings" %}
+        <p class="form__help">Final ordered rankings, same columns as normalized.</p>
+        {% elif d == "audit" %}
+        <p class="form__help">Hash-chained audit trail for this event.</p>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card__body">
+    <h2>JSON import</h2>
+    <p class="text-muted">Paste a JSON array of rows, or an object with a rows array. Zero partial writes: any error imports nothing.</p>
+    <form class="form form--flush-x" method="post" action="/events/{{ event.id }}/data">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="form__group">
+        <label class="form__label" for="dataset">Dataset</label>
+        <select class="form__input" id="dataset" name="dataset">
+          <option value="assignments">assignments</option>
+          <option value="scores">scores</option>
+        </select>
+        <span class="form__help">assignments rows need event_id, project_id, judge_user_id, and status (active, inactive, or withdrawn); track_id is optional. scores rows need project_id, judge_user_id, and value (0–100); event_id is optional.</span>
+      </div>
+      <div class="form__group">
+        <label class="form__label" for="payload">Rows (JSON)</label>
+        <textarea class="form__input" id="payload" name="payload" rows="6" placeholder='[{"project_id":"…","judge_user_id":"…","value":"42"}]'></textarea>
+        <span class="form__help">Must parse as JSON; otherwise this page re-renders with an error.</span>
+      </div>
+      <div class="form__actions">
+        <button class="button button--primary button--sm" type="submit">Import</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

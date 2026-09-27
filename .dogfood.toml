@@ -1,0 +1,22 @@
+# .dogfood.toml — acceptance checker config (see stuff/spec.md).
+# Run: py -3 stuff/run.py .dogfood.toml > acceptance-report.txt
+
+[portal]
+base_url = "http://localhost:3000"
+
+[tiers]
+claimed = ["T1", "T2"]
+pitch = "Self-hostable hackathon submission and judging platform with backend-enforced role isolation."
+
+[auth]
+organizer = "Cookie: sid=fixture-organizer.ywh2IYMFLJ2UlPEC41J9--BuHbrso7BkRB0zUOMn_SY"
+judge_a = "Cookie: sid=fixture-judge-a.Aq2LD1oS-PWtXxaesnv_bq3etk65JvvkRb-_aAlVzpo"
+judge_b = "Cookie: sid=fixture-judge-b.tsFvZnmowKjW-8T0YWwEmEA9fsjhSw7l-LYyUQ66SKM"
+participant = "Cookie: sid=fixture-participant.q-y5I8dnoFtrv7y8jmaKSS1HU1jDW7Pg9tyk6ER8JzM"
+
+[routes]
+gallery = "/gallery"
+submit = "/projects/new"
+judge_scores = "/api/judge/scores"
+peer_scores = "/api/judge/scores?judge=aecb7555-2dd4-41fb-bec5-ce297d31082f"
+csv_export = "/api/export.csv"

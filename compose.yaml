@@ -1,0 +1,40 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://dogfood:dogfood@db:5432/dogfood
+      # SESSION_SECRET: omit to auto-generate a persistent per-deployment
+      # secret on first boot (stored in the appdata volume). Set explicitly
+      # via environment for multi-replica deployments sharing sessions.
+      # Example: SESSION_SECRET=$(openssl rand -hex 32)
+      NODE_ENV: production
+    volumes:
+      - appdata:/app/data
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dogfood -d dogfood"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    environment:
+      POSTGRES_USER: dogfood
+      POSTGRES_PASSWORD: dogfood
+      POSTGRES_DB: dogfood
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  appdata:

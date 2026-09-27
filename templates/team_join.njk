@@ -1,0 +1,34 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card">
+  <div class="card__header">
+    <h1 class="card__title">Join Team</h1>
+    <p class="text-muted text-center">{{ eventName }}</p>
+  </div>
+
+  {% if flash %}
+  <div class="alert alert--{{ flash.kind }}" role="alert">{{ flash.message }}</div>
+  {% endif %}
+  {% if error %}
+  <div class="alert alert--error" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <div class="card__body">
+    <p>You are invited to join <strong>{{ team.name }}</strong>.</p>
+    <p class="text-muted">{{ team.memberCount }} of {{ team.maxSize }} seats filled.</p>
+    {% if alreadyMember %}
+    <div class="alert alert--warning" role="status">You are already on a team in this event. Joining another team is not allowed.</div>
+    {% endif %}
+  </div>
+
+  <form class="form" method="post" action="/events/{{ eventId }}/teams/join">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <input type="hidden" name="invite_token" value="{{ token }}">
+
+    <div class="form__actions">
+      <button class="button button--primary" type="submit">Join {{ team.name }}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

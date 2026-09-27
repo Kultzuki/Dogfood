@@ -1,0 +1,4 @@
+{# Plain-text line-break helper. Escape-then-replace: user text is escaped
+   FIRST, then newlines become <br>. This | safe is the only sanctioned
+   exception — never apply | safe to raw user input elsewhere. #}
+{% macro nl2br(text) %}{{ (text or "") | e | replace("\r\n", "<br>") | replace("\n", "<br>") | safe }}{% endmacro %}

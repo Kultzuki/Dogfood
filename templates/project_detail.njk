@@ -1,0 +1,32 @@
+{% extends "layout.njk" %}
+{% import "partials/nl2br.njk" as text %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">{{ project.title }}</h1>
+    {% if project.tagline %}
+    <p class="text-muted text-center">{{ project.tagline }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card__body">
+    {% if project.description %}
+    <p>{{ text.nl2br(project.description) }}</p>
+    {% endif %}
+    <p class="detail-meta">
+      {% if trackName %}<span class="badge">Track: {{ trackName }}</span>{% endif %}
+      {% if teamName %}<span class="badge">Team: {{ teamName }}</span>{% endif %}
+      <span class="badge">{{ eventName }}</span>
+    </p>
+    {% if project.techTags and project.techTags.length > 0 %}
+    <ul class="tag-list" aria-label="Tech tags">
+      {% for t in project.techTags %}
+      <li class="tag">{{ t }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <p class="detail-back"><a href="/gallery">Back to gallery</a></p>
+  </div>
+</div>
+{% endblock %}

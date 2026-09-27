@@ -1,0 +1,43 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card">
+  <div class="card__header">
+    <h1 class="card__title">{{ team.name }}</h1>
+    <p class="text-muted text-center">{{ eventName }} — {{ memberCount }} of {{ maxSize }} seats filled</p>
+  </div>
+
+  {% if flash %}
+  <div class="alert alert--{{ flash.kind }}" role="alert">{{ flash.message }}</div>
+  {% endif %}
+
+  <div class="card__body">
+    <h2>Roster</h2>
+    <ul>
+      {% for m in members %}
+      <li>{{ m.name }} ({{ m.email }}) — joined {{ m.createdAt }}</li>
+      {% else %}
+      <li class="text-muted">No members yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card__body">
+    <h2>Invite Link</h2>
+    <p class="text-muted">Share this page link so teammates can join. It carries your team invite token.</p>
+    <div class="form__group">
+      <label class="form__label" for="invite-link">Team invite link</label>
+      <input class="form__input" type="text" id="invite-link" name="invite-link" value="{{ inviteUrl }}" readonly>
+    </div>
+    {% if isOrganizer %}
+    <form class="form" method="post" action="/events/{{ eventId }}/my-team/rotate">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <p class="form__help">Rotating invalidates the current link immediately.</p>
+      <div class="form__actions">
+        <button class="button button--secondary" type="submit">Rotate Invite Token</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

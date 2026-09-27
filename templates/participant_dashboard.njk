@@ -1,0 +1,55 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">My Dashboard</h1>
+    <p class="text-muted text-center">{{ eventName }}</p>
+  </div>
+
+  {% if flash %}
+  <div class="alert alert--{{ flash.kind }}" role="alert">{{ flash.message }}</div>
+  {% endif %}
+
+  <div class="card__body">
+    <h2>My Team</h2>
+    {% if team %}
+    <p><strong>{{ team.name }}</strong> <span class="text-muted">({{ team.memberCount }} members)</span></p>
+    <p><a href="/events/{{ eventId }}/my-team">View team &amp; invite link</a></p>
+    {% else %}
+    <p class="text-muted">You are not on a team yet. Ask an organizer for a team invite link.</p>
+    {% endif %}
+  </div>
+
+  <div class="card__body">
+    <h2>My Projects</h2>
+    {% if projects and projects.length > 0 %}
+    <ul class="gallery-grid mt-4">
+      {% for p in projects %}
+      <li class="card card--page project-card">
+        <div class="card__header">
+          <h2 class="card__title project-card__title">{{ p.title }}</h2>
+        </div>
+        <div class="card__body">
+          <p class="project-card__meta"><span class="badge badge--{{ p.status }}">{{ p.status }}</span></p>
+          <p class="mt-2">
+            <a href="/events/{{ eventId }}/projects/{{ p.id }}/edit">Edit</a>
+            — <a href="/events/{{ eventId }}/projects/{{ p.id }}/versions">Versions</a>
+          </p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state__title">No projects yet.</p>
+      <p class="empty-state__text">Create your first project once you have joined a team.</p>
+    </div>
+    {% endif %}
+    {% if team %}
+    <p class="mt-4"><a class="button button--primary" href="/events/{{ eventId }}/projects/new">New Project</a></p>
+    {% endif %}
+    <p class="mt-2"><a href="/gallery">Public gallery</a></p>
+  </div>
+</div>
+{% endblock %}

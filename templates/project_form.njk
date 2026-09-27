@@ -1,0 +1,132 @@
+{% extends "layout.njk" %}
+{% import "partials/nl2br.njk" as text %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">{% if mode == "new" %}New Project{% elif mode == "confirm" %}Confirm Submission{% else %}Edit Project{% endif %}</h1>
+    <p class="text-muted text-center">{{ eventName }}</p>
+  </div>
+
+  {% if flash %}
+  <div class="alert alert--{{ flash.kind }}" role="alert">{{ flash.message }}</div>
+  {% endif %}
+  {% if error %}
+  <div class="alert alert--error" role="alert">{{ error }}</div>
+  {% endif %}
+  {% if deadlineText %}
+  <div class="alert alert--warning" role="status">{{ deadlineText }}</div>
+  {% endif %}
+
+  {% if mode == "confirm" %}
+  <div class="card__body">
+    <p>Review your project before submitting. Submission is final for this draft step and uses the server clock for the deadline.</p>
+    <p><strong>{{ project.title }}</strong> <span class="badge badge--{{ project.status }}">{{ project.status }}</span></p>
+    {% if project.tagline %}
+    <p class="text-muted">{{ project.tagline }}</p>
+    {% endif %}
+    {% if project.description %}
+    <p>{{ text.nl2br(project.description) }}</p>
+    {% endif %}
+    <form class="form" method="post" action="{{ submitAction }}">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="form__actions">
+        <button class="button button--primary" type="submit">Confirm Submission</button>
+        <a class="button button--secondary" href="/events/{{ eventId }}/projects/{{ project.id }}/edit">Back to Edit</a>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <form class="form" method="post" action="{{ formAction }}">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+    <div class="form__group">
+      <label class="form__label" for="title">Title</label>
+      <input class="form__input" type="text" id="title" name="title" required maxlength="255" value="{{ project.title }}">
+    </div>
+
+    <div class="form__group">
+      <label class="form__label" for="tagline">Tagline</label>
+      <input class="form__input" type="text" id="tagline" name="tagline" maxlength="255" value="{{ project.tagline }}">
+    </div>
+
+    <div class="form__group">
+      <label class="form__label" for="description">Description (plain text)</label>
+      <textarea class="form__input" id="description" name="description" rows="8">{{ project.description }}</textarea>
+      <p class="form__help">Plain text only. Line breaks are preserved; no formatting markup is rendered.</p>
+    </div>
+
+    <div class="form__group">
+      <label class="form__label" for="track">Track</label>
+      <select class="form__input" id="track" name="track_id">
+        <option value="">No track</option>
+        {% for t in tracks %}
+        <option value="{{ t.id }}"{% if project.trackId == t.id %} selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form__group">
+      <label class="form__label" for="tech-tags">Tech tags (comma separated)</label>
+      <input class="form__input" type="text" id="tech-tags" name="tech_tags" value="{{ techTagsRaw }}" placeholder="node, postgres, css">
+    </div>
+
+    {% if questions and questions.length > 0 %}
+    <div class="card__body">
+      <h2>Additional Questions</h2>
+      {% for q in questions %}
+      <div class="form__group">
+        <label class="form__label" for="answer-{{ q.id }}">{{ q.label }}{% if q.required %} (required){% endif %}</label>
+        {% if q.qtype == "choice" %}
+        <select class="form__input" id="answer-{{ q.id }}" name="answer_{{ q.id }}">
+          <option value="">Select an option</option>
+          {% for opt in q.options %}
+          <option value="{{ opt }}"{% if answers[q.id] == opt %} selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+        {% elif q.qtype == "number" %}
+        <input class="form__input" type="number" id="answer-{{ q.id }}" name="answer_{{ q.id }}" value="{{ answers[q.id] }}">
+        {% else %}
+        <input class="form__input" type="text" id="answer-{{ q.id }}" name="answer_{{ q.id }}" maxlength="2000" value="{{ answers[q.id] }}">
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="form__actions">
+      <button class="button button--primary" type="submit">{% if mode == "new" %}Create Draft{% else %}Save Draft{% endif %}</button>
+      {% if mode == "edit" %}
+      <a class="button button--secondary" href="/events/{{ eventId }}/projects/{{ project.id }}/submit">Review &amp; Submit</a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if mode == "edit" %}
+  <div class="card__body">
+    <h2>Uploads</h2>
+    {% if uploads and uploads.length > 0 %}
+    <ul>
+      {% for u in uploads %}
+      <li><a href="/uploads/{{ u.id }}">{{ u.originalName }}</a> <span class="text-muted">({{ u.mime }}, {{ u.sizeBytes }} bytes)</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted">No files uploaded.</p>
+    {% endif %}
+    <form class="form" method="post" action="/events/{{ eventId }}/projects/{{ project.id }}/uploads" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="form__group">
+        <label class="form__label" for="file">Add file (png, jpg, gif, webp, pdf — max 10 MB)</label>
+        <input class="form__input" type="file" id="file" name="file" required>
+      </div>
+      <div class="form__actions">
+        <button class="button button--secondary" type="submit">Upload</button>
+      </div>
+    </form>
+    <p class="mt-2"><a href="/events/{{ eventId }}/projects/{{ project.id }}/versions">Version history</a></p>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

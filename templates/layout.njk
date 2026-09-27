@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dogfood — Hackathon Platform</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="header">
+    <div class="header__inner container">
+      <a href="/" class="header__brand">Dogfood</a>
+      <nav class="header__nav" aria-label="Primary">
+        <ul class="header__nav-list">
+          {% if currentUser %}
+          <li class="header__nav-item"><a href="/gallery" class="header__nav-link">Gallery</a></li>
+          {% if currentUser.role == "judge" %}
+          <li class="header__nav-item"><a href="/judging" class="header__nav-link">Judging</a></li>
+          {% endif %}
+          {% if currentUser.role == "organizer" or currentUser.role == "admin" %}
+          <li class="header__nav-item"><a href="/events" class="header__nav-link">Events</a></li>
+          {% endif %}
+          <li class="header__nav-item">
+            <form method="post" action="/logout">
+              <input type="hidden" name="_csrf" value="{{ csrfToken | escape }}">
+              <button class="button button--sm button--secondary" type="submit">Sign Out</button>
+            </form>
+          </li>
+          {% else %}
+          <li class="header__nav-item"><a href="/gallery" class="header__nav-link">Gallery</a></li>
+          <li class="header__nav-item"><a href="/" class="header__nav-link">Sign In</a></li>
+          <li class="header__nav-item"><a href="/register" class="header__nav-link">Register</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main" id="main-content">
+    <div class="container">
+      {% if flash %}
+      {% if flash.kind == "success" %}
+      <div class="alert alert--success" role="status" aria-live="polite">{{ flash.message | escape }}</div>
+      {% elif flash.kind == "error" %}
+      <div class="alert alert--error" role="alert" aria-live="polite">{{ flash.message | escape }}</div>
+      {% else %}
+      <div class="alert alert--warning" role="status" aria-live="polite">{{ flash.message | escape }}</div>
+      {% endif %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner container">
+      <p class="footer__copy">&copy; 2026 Dogfood Hackathon Platform</p>
+    </div>
+  </footer>
+  <script src="/static/js/ui.js" defer></script>
+</body>
+</html>

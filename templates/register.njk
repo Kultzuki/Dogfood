@@ -1,0 +1,42 @@
+{% extends "layout.njk" %}
+{% import "macros/forms.njk" as f %}
+
+{% block content %}
+<div class="auth-split">
+  <div class="card card--page">
+    <div class="card__header">
+      <h1 class="card__title">Create Account</h1>
+    </div>
+
+    {{ f.formError(error) }}
+
+    <form class="form" method="post" action="/register" novalidate>
+      <input type="hidden" name="_csrf" value="{{ csrfToken | escape }}">
+
+      {{ f.input(id="name", name="name", label="Display name", type="text", value=values.name, error=errors.name, autocomplete="name", placeholder="Ada Lovelace", required=true) }}
+
+      {{ f.input(id="email", name="email", label="Email address", type="email", value=values.email, error=errors.email, autocomplete="email", placeholder="you@example.com", required=true) }}
+
+      {{ f.input(id="password", name="password", label="Password", type="password", value="", error=errors.password, autocomplete="new-password", placeholder="Password", required=true) }}
+
+      <div class="form__actions">
+        {{ f.button("Create Account") }}
+      </div>
+    </form>
+
+    <div class="card__footer">
+      <p class="form__link">Already have an account? <a href="/">Sign in</a></p>
+    </div>
+  </div>
+
+  <aside class="auth-side" aria-label="About Dogfood">
+    <p class="auth-side__title">One account, every event.</p>
+    <p class="auth-side__text">Register once, then join teams, submit projects, and follow results across hackathons run on this platform.</p>
+    <ul class="auth-side__list">
+      <li>Passwords are hashed; sessions expire</li>
+      <li>Join a team with an invite link</li>
+      <li>Browse the public project gallery</li>
+    </ul>
+  </aside>
+</div>
+{% endblock %}

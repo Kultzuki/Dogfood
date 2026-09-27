@@ -1,0 +1,64 @@
+{# Shared form macros — import with {% import "macros/forms.njk" as f %}.
+   Every interpolated value is explicitly | escape (autoescape is also on).
+   Classes come from static/css/main.css (card/form/button/alert BEM). #}
+
+{% macro formError(message) %}
+{% if message %}
+<div class="alert alert--error" role="alert">{{ message | escape }}</div>
+{% endif %}
+{% endmacro %}
+
+{% macro fieldError(message, fieldId="") %}
+{% if message %}
+<span class="form__error"{% if fieldId %} id="{{ fieldId | escape }}-error"{% endif %}>{{ message | escape }}</span>
+{% endif %}
+{% endmacro %}
+
+{% macro input(id, name, label, type="text", value="", error="", autocomplete="", placeholder="", required=false) %}
+<div class="form__group">
+  <label class="form__label" for="{{ id | escape }}">{{ label | escape }}</label>
+  <input class="form__input{% if error %} form__input--error{% endif %}"
+    type="{{ type | escape }}"
+    id="{{ id | escape }}"
+    name="{{ name | escape }}"
+    value="{{ value | escape }}"
+    {%- if autocomplete %} autocomplete="{{ autocomplete | escape }}"{% endif %}
+    {%- if placeholder %} placeholder="{{ placeholder | escape }}"{% endif %}
+    {%- if required %} required{% endif %}
+    {%- if error %} aria-invalid="true" aria-describedby="{{ id | escape }}-error"{% endif %}>
+  {{ fieldError(error, id) }}
+</div>
+{% endmacro %}
+
+{% macro textarea(id, name, label, value="", error="", placeholder="", required=false, rows=4) %}
+<div class="form__group">
+  <label class="form__label" for="{{ id | escape }}">{{ label | escape }}</label>
+  <textarea class="form__input{% if error %} form__input--error{% endif %}"
+    id="{{ id | escape }}"
+    name="{{ name | escape }}"
+    rows="{{ rows | escape }}"
+    {%- if placeholder %} placeholder="{{ placeholder | escape }}"{% endif %}
+    {%- if required %} required{% endif %}
+    {%- if error %} aria-invalid="true" aria-describedby="{{ id | escape }}-error"{% endif %}>{{ value | escape }}</textarea>
+  {{ fieldError(error, id) }}
+</div>
+{% endmacro %}
+
+{% macro select(id, name, label, options=[], selected="", error="") %}
+<div class="form__group">
+  <label class="form__label" for="{{ id | escape }}">{{ label | escape }}</label>
+  <select class="form__input{% if error %} form__input--error{% endif %}"
+    id="{{ id | escape }}"
+    name="{{ name | escape }}"
+    {%- if error %} aria-invalid="true" aria-describedby="{{ id | escape }}-error"{% endif %}>
+    {% for opt in options %}
+    <option value="{{ opt.value | escape }}"{% if opt.value == selected %} selected{% endif %}>{{ opt.label | escape }}</option>
+    {% endfor %}
+  </select>
+  {{ fieldError(error, id) }}
+</div>
+{% endmacro %}
+
+{% macro button(label, variant="primary", type="submit") %}
+<button class="button button--{{ variant | escape }}" type="{{ type | escape }}">{{ label | escape }}</button>
+{% endmacro %}
