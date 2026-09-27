@@ -45,6 +45,9 @@ export const AUDIT_ACTIONS = [
   "event.finalize",
   "event.publish",
   "admin.action",
+  "vote.cast",
+  "voting.window",
+  "comment.create",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

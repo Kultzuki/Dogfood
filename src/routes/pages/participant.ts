@@ -106,6 +106,61 @@ export async function registerParticipantPages(
     );
     const row = r.rows[0];
     if (!row) return reply.code(404).send({ error: "not_found" });
+    // T3 community signals (best-effort: fallbacks keep the 200 shape).
+    let voteCount: number | null = null;
+    let votingOpen = false;
+    let userVoted = false;
+    let detailEventId = "";
+    let comments: { body: string; author: string; created_at: unknown }[] = [];
+    try {
+      const w = await pool.query<{
+        active: boolean;
+        n: string;
+        event_id: string;
+      }>(
+        `SELECT (e.voting_opens_at IS NOT NULL AND e.voting_opens_at <= now()
+                 AND (e.voting_closes_at IS NULL OR e.voting_closes_at > now())) AS active,
+                (SELECT COUNT(*)::int FROM community_votes WHERE project_id = $1) AS n,
+                e.id AS event_id
+           FROM projects p JOIN events e ON e.id = p.event_id
+          WHERE p.id = $1 AND p.status = 'submitted'`,
+        [projectId],
+      );
+      const info = w.rows[0];
+      if (info) {
+        votingOpen = info.active;
+        detailEventId = info.event_id;
+        voteCount = info.active ? null : Number(info.n);
+        const userId = getUserId(req);
+        if (userId) {
+          const v = await pool.query(
+            `SELECT 1 FROM community_votes WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
+            [projectId, userId],
+          );
+          userVoted = (v.rowCount ?? 0) > 0;
+        }
+      }
+    } catch {
+      voteCount = null;
+      votingOpen = false;
+      userVoted = false;
+    }
+    try {
+      const c = await pool.query<{
+        body: string;
+        author: string;
+        created_at: unknown;
+      }>(
+        `SELECT c.body, c.created_at, COALESCE(u.name, 'deleted user') AS author
+           FROM project_comments c LEFT JOIN users u ON u.id = c.user_id
+          WHERE c.project_id = $1
+          ORDER BY c.created_at ASC LIMIT 100`,
+        [projectId],
+      );
+      comments = c.rows;
+    } catch {
+      comments = [];
+    }
     return reply.view("project_detail.njk", {
       project: {
         title: row.title,
@@ -116,6 +171,12 @@ export async function registerParticipantPages(
       trackName: row.track_name ?? "",
       teamName: row.team_name ?? "",
       eventName: row.event_name,
+      projectId,
+      eventId: detailEventId,
+      voteCount,
+      votingOpen,
+      userVoted,
+      comments,
     });
   });
 }

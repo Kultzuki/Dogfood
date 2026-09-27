@@ -9,14 +9,14 @@ claimed = ["T1", "T2"]
 pitch = "Self-hostable hackathon submission and judging platform with backend-enforced role isolation."
 
 [auth]
-organizer = "Cookie: sid=fixture-organizer.ywh2IYMFLJ2UlPEC41J9--BuHbrso7BkRB0zUOMn_SY"
-judge_a = "Cookie: sid=fixture-judge-a.Aq2LD1oS-PWtXxaesnv_bq3etk65JvvkRb-_aAlVzpo"
-judge_b = "Cookie: sid=fixture-judge-b.tsFvZnmowKjW-8T0YWwEmEA9fsjhSw7l-LYyUQ66SKM"
-participant = "Cookie: sid=fixture-participant.q-y5I8dnoFtrv7y8jmaKSS1HU1jDW7Pg9tyk6ER8JzM"
+organizer = "Cookie: sid=fixture-organizer.KeMIIhakL6t1BOz9oMYUwZqwJYDnHYEZkHVZTDRWidk"
+judge_a = "Cookie: sid=fixture-judge-a.7M_2QcaX99tPOXhZLpwnrdfOcThUM2jEbrQU_cmxvXA"
+judge_b = "Cookie: sid=fixture-judge-b.Qsl63hTn6G_YCkx6q9BZmKk3F7tU26t2eCHcUs7vTwI"
+participant = "Cookie: sid=fixture-participant.jsERXEIulKgJlzZNp7-zvmc6qy3xpTnJ0v4dJy72bUE"
 
 [routes]
 gallery = "/gallery"
 submit = "/projects/new"
 judge_scores = "/api/judge/scores"
-peer_scores = "/api/judge/scores?judge=aecb7555-2dd4-41fb-bec5-ce297d31082f"
+peer_scores = "/api/judge/scores?judge=a880dba9-eb60-4860-9333-ae8ec90ef76f"
 csv_export = "/api/export.csv"

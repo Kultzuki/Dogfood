@@ -21,6 +21,8 @@ export interface EventInfo {
   name: string;
   state: string;
   submissions_close_at: string | null;
+  voting_opens_at?: string | null;
+  voting_closes_at?: string | null;
 }
 
 export interface TeamInfo {
@@ -97,7 +99,8 @@ export async function eventExists(id: string): Promise<boolean> {
 
 export async function getEvent(id: string): Promise<EventInfo | undefined> {
   const r = await pool.query<EventInfo>(
-    `SELECT id, name, state, submissions_close_at FROM events WHERE id = $1`,
+    `SELECT id, name, state, submissions_close_at, voting_opens_at, voting_closes_at
+       FROM events WHERE id = $1`,
     [id],
   );
   return r.rows[0];

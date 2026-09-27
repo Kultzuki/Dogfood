@@ -57,13 +57,19 @@ printed `Cookie: sid=...` auth headers, and the route map (`/gallery`,
 `acceptance-report.txt` is the verbatim output of that run.
 
 Current verdict: claimed `T1 T2`, verified `T1 T2` (7/7 checks pass).
-Out of scope and not claimed: community voting, comments, webhooks, and
-certificates do not exist in this build.
+T3 community voting + comments are implemented (authenticated one-vote-per-project
+with a per-event voting window, hidden counts while voting is active,
+deterministic per-voter ballots, attributed comments) and covered by
+`src/routes/community.test.ts`, but the official checker has no T3 probes —
+so T3 is reported here, not claimed in `.dogfood.toml`.
+Out of scope and not claimed: webhooks and certificates do not exist in
+this build.
 
 ## Tests
 
 There is no top-level `tests/` directory. The suite lives colocated with
-the code as `src/**/*.test.ts` (9 files: `authz/isolation`,
+the code as `src/**/*.test.ts` (10 files: `authz/isolation`,
 `judging/engine`, `lib/audit`, `lib/csv`, `lib/eventTransitions`,
-`lib/password`, `lib/rateLimit`, `lib/uploadStore`, `routes/rubrics`).
+`lib/password`, `lib/rateLimit`, `lib/uploadStore`, `routes/rubrics`,
+`routes/community`).
 Run it with `npm test` (`vitest run`).

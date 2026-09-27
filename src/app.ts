@@ -23,11 +23,13 @@ import scoreRoutes from "./routes/scores.js";
 import auditRoutes from "./routes/audit.js";
 import exportRoutes from "./routes/exports.js";
 import { registerRubricRoutes } from "./routes/rubrics.js";
+import communityRoutes from "./routes/community.js";
 import acceptanceRoutes from "./routes/acceptance.js";
 import { registerShellPages } from "./routes/pages/shell.js";
 import { registerParticipantPages } from "./routes/pages/participant.js";
 import { registerJudgePages } from "./routes/pages/judge.js";
 import { registerOrganizerPages } from "./routes/pages/organizer.js";
+import { registerCommunityPages } from "./routes/pages/community.js";
 
 export interface AppOptions {
   logger?: FastifyServerOptions["logger"];
@@ -91,6 +93,7 @@ export async function buildApp(opts: AppOptions = {}) {
   await app.register(auditRoutes);
   await app.register(exportRoutes);
   await app.register(registerRubricRoutes);
+  await app.register(communityRoutes);
   await app.register(acceptanceRoutes);
 
   // ── 8. Server-rendered UI pages ───────────────────────────────────
@@ -98,6 +101,7 @@ export async function buildApp(opts: AppOptions = {}) {
   await app.register(registerParticipantPages);
   await app.register(registerJudgePages);
   await app.register(registerOrganizerPages);
+  await app.register(registerCommunityPages);
 
   await app.ready();
   return app;

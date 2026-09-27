@@ -1,0 +1,61 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">Community Ballot</h1>
+    <p class="text-muted text-center">{{ eventName }} · one vote per project · order is shuffled per voter and stable on refresh</p>
+  </div>
+
+  {% if flash %}
+  <div class="alert alert--{{ flash.kind }}" role="alert">{{ flash.message }}</div>
+  {% endif %}
+
+  <div class="card__body">
+    {% if votingActive %}
+    <div class="alert alert--warning" role="status">Voting is open — results stay hidden until the window closes.</div>
+    {% else %}
+    <div class="alert alert--success" role="status">Voting is closed — counts below are final for this window.</div>
+    {% endif %}
+
+    {% if items and items.length > 0 %}
+    <ul class="gallery-grid mt-4">
+      {% for it in items %}
+      <li class="card card--page project-card">
+        <div class="card__header">
+          <h2 class="card__title project-card__title"><a href="/gallery/{{ it.id }}">{{ it.title }}</a></h2>
+        </div>
+        <div class="card__body">
+          <p class="project-card__meta">
+            {% if it.voted %}
+            <span class="badge badge--scored">VOTED</span>
+            {% elif votingActive %}
+            <span class="badge badge--pending">NOT VOTED</span>
+            {% endif %}
+            {% if it.votes !== null %}
+            <span class="badge">{{ it.votes }} votes</span>
+            {% endif %}
+          </p>
+          {% if votingActive and not it.voted %}
+          <form class="form form--flush mt-2" method="post" action="/events/{{ eventId }}/ballot">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="project_id" value="{{ it.id }}">
+            <div class="form__actions form__actions--start">
+              <button class="button button--primary button--sm" type="submit">Vote for this project</button>
+            </div>
+          </form>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state__title">No votable projects right now.</p>
+      <p class="empty-state__text">Projects appear here once submitted to this event.</p>
+    </div>
+    {% endif %}
+    <p class="mt-4"><a href="/gallery">Back to gallery</a></p>
+  </div>
+</div>
+{% endblock %}

@@ -94,7 +94,50 @@ export default async function galleryRoutes(app: FastifyInstance): Promise<void>
         trackId,
         tag: tag || undefined,
       });
-      return reply.view("gallery.njk", { q, track, tag, projects });
+      // T3 community signals (best-effort: a failure here must never fail
+      // the public gallery — counts simply render as unavailable).
+      let voteCounts: Record<string, number> = {};
+      let votesHidden: Record<string, boolean> = {};
+      let votingOpen: Record<string, boolean> = {};
+      try {
+        const ids = projects.map((p) => p.id);
+        if (ids.length > 0) {
+          const [counts, windows] = await Promise.all([
+            pool.query<{ project_id: string; n: string }>(
+              `SELECT project_id, COUNT(*)::int AS n FROM community_votes
+                WHERE project_id = ANY($1) GROUP BY project_id`,
+              [ids],
+            ),
+            pool.query<{ project_id: string; active: boolean }>(
+              `SELECT p.id AS project_id,
+                 (e.voting_opens_at IS NOT NULL AND e.voting_opens_at <= now()
+                  AND (e.voting_closes_at IS NULL OR e.voting_closes_at > now())) AS active
+                 FROM projects p JOIN events e ON e.id = p.event_id
+                WHERE p.id = ANY($1)`,
+              [ids],
+            ),
+          ]);
+          for (const row of counts.rows)
+            voteCounts[row.project_id] = Number(row.n);
+          for (const row of windows.rows) {
+            votesHidden[row.project_id] = row.active;
+            votingOpen[row.project_id] = row.active;
+          }
+        }
+      } catch {
+        voteCounts = {};
+        votesHidden = {};
+        votingOpen = {};
+      }
+      return reply.view("gallery.njk", {
+        q,
+        track,
+        tag,
+        projects,
+        voteCounts,
+        votesHidden,
+        votingOpen,
+      });
     } catch {
       return reply
         .code(503)

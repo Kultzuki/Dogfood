@@ -83,10 +83,15 @@ trail. Clock skew and the missing override are accepted v1 gaps.
 | Auth throttle 30/10min/IP | `src/lib/rateLimit.ts`, `src/routes/auth.ts` | Registration abuse friction (1, partial) |
 | CSRF on all mutations | `src/plugins/csrf.ts` | Forged writes (2, partial) |
 | Signed sessions, scrypt, revocation | `src/plugins/session.ts`, `src/lib/password.ts` | Account takeover preconditions (all) |
+| One-vote-per-project UNIQUE + window predicate on DB clock | `drizzle/0014_community.sql`, `src/routes/community.ts` | Duplicate votes, out-of-window votes (2, partial) |
+| Vote burst throttle 60/h + per-user velocity cap 100/h + audit `vote.cast` | `src/routes/community.ts`, `src/lib/rateLimit.ts` | Excessive voting / ballot stuffing signals (2, partial) |
+| Counts 404 while voting is active (organizers only) | `src/routes/community.ts` | Hidden-result bypass (2) |
+| Comment throttle 30/10min + attribution + audit `comment.create` | `src/routes/community.ts` | Comment spam friction (2, partial) |
 
 ## Explicitly not claimed
 
-Sybil-proof voting, ballot-stuffing protection, scrape prevention,
-statistical collusion detection, blind review, NTP enforcement. Each
-needs either a T3 build or an operational control before anyone asserts
-it.
+Sybil-proof voting (registration is open, so one human can hold many
+accounts — the unique constraint binds accounts, not humans),
+statistical ballot-stuffing detection, scrape prevention, statistical
+collusion detection, blind review, NTP enforcement. Each needs either
+further T3 work or an operational control before anyone asserts it.

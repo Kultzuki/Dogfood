@@ -18,6 +18,12 @@
       {% if trackName %}<span class="badge">Track: {{ trackName }}</span>{% endif %}
       {% if teamName %}<span class="badge">Team: {{ teamName }}</span>{% endif %}
       <span class="badge">{{ eventName }}</span>
+      {% if voteCount !== null and voteCount !== undefined %}
+      <span class="badge badge--scored">{{ voteCount }} community votes</span>
+      {% endif %}
+      {% if userVoted %}
+      <span class="badge badge--scored">YOU VOTED</span>
+      {% endif %}
     </p>
     {% if project.techTags and project.techTags.length > 0 %}
     <ul class="tag-list" aria-label="Tech tags">
@@ -26,7 +32,53 @@
       {% endfor %}
     </ul>
     {% endif %}
+    {% if votingOpen and currentUser and eventId %}
+    {% if userVoted %}
+    <p class="text-muted mt-2">You voted for this project — one vote per project is counted.</p>
+    {% else %}
+    <form class="form form--flush mt-2" method="post" action="/events/{{ eventId }}/ballot">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="project_id" value="{{ projectId }}">
+      <div class="form__actions form__actions--start">
+        <button class="button button--primary button--sm" type="submit">Vote for this project</button>
+      </div>
+    </form>
+    {% endif %}
+    {% endif %}
     <p class="detail-back"><a href="/gallery">Back to gallery</a></p>
+  </div>
+
+  <div class="card__body">
+    <h2>Comments</h2>
+    {% if comments and comments.length > 0 %}
+    <ul class="flex flex-col gap-4 mt-2">
+      {% for c in comments %}
+      <li class="card card--page">
+        <div class="card__body">
+          <p>{{ text.nl2br(c.body) }}</p>
+          <p class="form__help mt-2">{{ c.author }} · {{ c.created_at }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted">No comments yet.</p>
+    {% endif %}
+    {% if currentUser %}
+    <form class="form form--flush-x mt-2" method="post" action="/gallery/{{ projectId }}/comments">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="form__group">
+        <label class="form__label" for="comment-body">Add a comment</label>
+        <textarea class="form__input" id="comment-body" name="body" rows="4" maxlength="2000" required placeholder="Share feedback on this project"></textarea>
+        <span class="form__help">Plain text, up to 2000 characters. Posting as your account; comments are attributed and audited.</span>
+      </div>
+      <div class="form__actions form__actions--start">
+        <button class="button button--primary button--sm" type="submit">Post comment</button>
+      </div>
+    </form>
+    {% else %}
+    <p class="text-muted mt-2"><a href="/">Sign in</a> to post a comment.</p>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

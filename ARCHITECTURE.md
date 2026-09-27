@@ -33,7 +33,7 @@ analytics, or telemetry are required.
 | `src/app.ts` | Application factory; registers plugins in dependency order. |
 | `src/authz/` | `roles.ts` (role types), `guards.ts` (`requireAuth` 401 / `requireEventRole` + `requireTrackScope` + `requireAssignment` 404-isolation, never 403). |
 | `src/judging/` | Pure deterministic pipeline (`validate → dedupe → exclude → canonical-sort → normalize → aggregate → rank`; `centering` method; tie-break chain; SHA-256 `inputHash`). No I/O, no clocks — see JUDGING.md. |
-| `src/routes/pages/` | Server-rendered UI: `shell.ts` (`/`, `/register`), `participant*.ts` (dashboard, teams, project draft/edit/submit, uploads), `judge.ts` (queue `/events/:eventId/judge`, ballot `/judge/assignments/:id`), `organizer.ts` (`/events/new`, `/events/:eventId/manage`, `judging-progress`, `audit-viewer`, `data`). |
+| `src/routes/pages/` | Server-rendered UI: `shell.ts` (`/`, `/register`), `participant*.ts` (dashboard, teams, project draft/edit/submit, uploads), `judge.ts` (queue `/events/:eventId/judge`, ballot `/judge/assignments/:id`), `organizer.ts` (`/events/new`, `/events/:eventId/manage`, `judging-progress`, `audit-viewer`, `data`), `community.ts` (T3 ballot `GET/POST /events/:eventId/ballot`, detail comment form `POST /gallery/:projectId/comments`; forms never POST to `/api/*`). |
 
 ### Plugins (`src/plugins/`)
 
@@ -57,6 +57,7 @@ analytics, or telemetry are required.
 | `gallery.ts` | Public `GET /gallery` (search `q`, `track` UUID-validated, `tag`); organizer question admin; team-member custom answers. |
 | `scores.ts` | Assignments (`POST /api/assignments`) + scores with rescore chain; owner isolation via 404 (never 403). |
 | `rubrics.ts` | Weighted rubrics: `GET /api/events/:eventId/rubric` (active weights), `POST …/rubrics` (organizer-only new version, weights sum to 100). |
+| `community.ts` | T3 community voting + comments JSON API: `POST /api/projects/:id/vote` (auth, in-window, one vote per project per user), `GET …/votes` (counts; 404 for non-organizers while voting is active), `GET/POST …/comments` (public list, authenticated create, 1–2000 chars), `POST /api/events/:id/voting-window` (organizer-only window config). Ballot order is `sha256(userId&#124;projectId)` sort — deterministic per voter, stable on refresh. |
 | `acceptance.ts` | Checker aliases only (no new business logic): `POST /projects/new` (deadline probe), `GET /api/judge/scores[?judge=]` (403-mapped isolation probe), `GET /api/export.csv` (organizer CSV probe). |
 | `exports.ts` | Organizer CSV hub (`GET /api/events/:eventId/export?dataset=…`) + all-or-nothing row import (`POST …/import`). |
 | `audit.ts` | Organizer audit read (`GET /api/events/:eventId/audit`). |
