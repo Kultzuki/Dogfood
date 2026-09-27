@@ -25,6 +25,7 @@ import {
   appendAuditForRequest,
   type PoolLike,
 } from "../lib/audit.js";
+import { fanoutWebhooks } from "../lib/webhooks.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -292,6 +293,15 @@ export default async function communityRoutes(
         resourceId: res.vote.id,
         detail: { project_id: res.vote.project_id },
       });
+      await fanoutWebhooks(pool as unknown as PoolLike, {
+        type: "vote.cast",
+        eventId: res.vote.event_id,
+        data: {
+          vote_id: res.vote.id,
+          project_id: res.vote.project_id,
+          user_id: res.vote.user_id,
+        },
+      });
       return reply.code(201).send({ vote: res.vote });
     },
   );
@@ -365,6 +375,11 @@ export default async function communityRoutes(
         resourceType: "comment",
         resourceId: row.id,
         detail: { project_id: projectId },
+      });
+      await fanoutWebhooks(db, {
+        type: "comment.create",
+        eventId: proj.event_id,
+        data: { comment_id: row.id, project_id: projectId },
       });
       return reply
         .code(201)

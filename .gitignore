@@ -10,3 +10,5 @@ cookies.txt
 .codegraph/
 .omo/
 .opencode/
+# Local record-signing keypair (Ed25519 private key — never commit).
+data/

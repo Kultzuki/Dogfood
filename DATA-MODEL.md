@@ -29,6 +29,9 @@ journaled in `schema_migrations`).
 | `rubric_versions` | `0013_rubrics.sql` | Organizer-configurable weighted rubrics. One active version per event (`UNIQUE(event_id, version)`; deactivation in the same txn, enforced in app code). `weights` JSONB holds exactly `{technical, innovation, impact, polish}`, each 0–100, summing to 100 (validated, else 422). Events with no row use the default 30/25/25/20 (version 1). Every score pins the active version at submit time (`scores.rubric_version`); reweighting never rewrites old scores. |
 | `scores` | `0010_scores.sql` (+ `comment TEXT` from `0012_fixtures.sql`) | Scalar `value NUMERIC` with DB check `0 <= value <= 100`. Rescore chain via `version` / `supersedes_id` / `is_current`. |
 | `audit_logs` | `0011_audit.sql` | Append-only (DB trigger), hash-chained audit trail. |
+| `webhook_subscriptions` | `0015_t4.sql` | T4 per-event webhook targets: `url`, HMAC `secret` (write-only), `events` type list, `is_active`. Deliveries cascade on delete. |
+| `webhook_deliveries` | `0015_t4.sql` | T4 delivery outbox: `event_type`, `payload` JSONB, `status` ∈ pending/delivered/failed/dead (DB check), `attempts`, `next_retry_at`, `last_error`. |
+| `certificates` | `0015_t4.sql` | T4 deterministic records: `type` ∈ judge-participation/project-submission/participant (DB check), canonical `payload` JSONB, `digest` (SHA-256 hex), Ed25519 `signature`, `kid`. `UNIQUE(event_id, type, subject_id)` makes re-issue stable. |
 | `community_votes` | `0014_community.sql` | T3 community votes. `UNIQUE(event_id, project_id, user_id)` — one vote per project per user, enforced by the DB so concurrent double-votes cannot both land. No unvote: rows are never updated or deleted by the app. |
 | `project_comments` | `0014_community.sql` | T3 project comments. `body TEXT` with DB check `char_length BETWEEN 1 AND 2000` (app validates identically, else 422). Attributed to `user_id`; rendered escaped via Nunjucks autoescape. |
 | `schema_migrations` | `src/db/migrate.ts` | Applied-migration journal (boot idempotency). |
@@ -88,5 +91,6 @@ Boot converges the `Sample Hack 2026` event to the fixture content:
   as `text/csv` (header `id,event_id,project_id,judge_user_id,value,version,
   is_current,created_at`, RFC-4180 escaping via `src/lib/csv.ts`).
 - `GET /api/events/:eventId/export?dataset=assignments|scores-raw|
-  scores-normalized|rankings|audit` — full organizer CSV hub (streaming).
+  scores-normalized|rankings|audit|votes|comments` — full organizer CSV hub (streaming).
 - `GET /gallery` — public HTML gallery of submitted projects.
+- `GET /gallery/embed` — same visibility query as the gallery, chromeless widget document.

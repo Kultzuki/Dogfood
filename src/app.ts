@@ -24,6 +24,9 @@ import auditRoutes from "./routes/audit.js";
 import exportRoutes from "./routes/exports.js";
 import { registerRubricRoutes } from "./routes/rubrics.js";
 import communityRoutes from "./routes/community.js";
+import webhookRoutes from "./routes/webhooks.js";
+import certificateRoutes from "./routes/certificates.js";
+import apiIndexRoutes from "./routes/api.js";
 import acceptanceRoutes from "./routes/acceptance.js";
 import { registerShellPages } from "./routes/pages/shell.js";
 import { registerParticipantPages } from "./routes/pages/participant.js";
@@ -94,6 +97,9 @@ export async function buildApp(opts: AppOptions = {}) {
   await app.register(exportRoutes);
   await app.register(registerRubricRoutes);
   await app.register(communityRoutes);
+  await app.register(webhookRoutes);
+  await app.register(certificateRoutes);
+  await app.register(apiIndexRoutes);
   await app.register(acceptanceRoutes);
 
   // ── 8. Server-rendered UI pages ───────────────────────────────────

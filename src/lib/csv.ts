@@ -54,7 +54,6 @@ export const CENTERED_COLUMNS = [
 ] as const;
 
 export const RANKING_COLUMNS = [...CENTERED_COLUMNS] as unknown as typeof CENTERED_COLUMNS;
-
 export const AUDIT_COLUMNS = [
   "seq",
   "event_id",
@@ -65,12 +64,31 @@ export const AUDIT_COLUMNS = [
   "created_at",
 ] as const;
 
+export const VOTES_COLUMNS = [
+  "id",
+  "event_id",
+  "project_id",
+  "user_id",
+  "created_at",
+] as const;
+
+export const COMMENTS_COLUMNS = [
+  "id",
+  "event_id",
+  "project_id",
+  "user_id",
+  "body",
+  "created_at",
+] as const;
+
 export type ExportDataset =
   | "assignments"
   | "scores-raw"
   | "scores-normalized"
   | "rankings"
-  | "audit";
+  | "audit"
+  | "votes"
+  | "comments";
 
 export type ImportDataset = "assignments" | "scores";
 
@@ -80,6 +98,8 @@ export const EXPORT_DATASETS: readonly ExportDataset[] = [
   "scores-normalized",
   "rankings",
   "audit",
+  "votes",
+  "comments",
 ];
 
 export function headerFor(dataset: ExportDataset): readonly string[] {
@@ -94,6 +114,10 @@ export function headerFor(dataset: ExportDataset): readonly string[] {
       return RANKING_COLUMNS;
     case "audit":
       return AUDIT_COLUMNS;
+    case "votes":
+      return VOTES_COLUMNS;
+    case "comments":
+      return COMMENTS_COLUMNS;
   }
 }
 

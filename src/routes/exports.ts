@@ -103,6 +103,18 @@ function exportRecords(dataset: ExportDataset, rows: AnyRow[]): Record<string, s
         resource_type: str(r, "resource_type"), resource_id: str(r, "resource_id"),
         created_at: str(r, "created_at"),
       }));
+    case "votes":
+      return rows.map((r) => ({
+        id: str(r, "id"), event_id: str(r, "event_id"),
+        project_id: str(r, "project_id"), user_id: str(r, "user_id"),
+        created_at: str(r, "created_at"),
+      }));
+    case "comments":
+      return rows.map((r) => ({
+        id: str(r, "id"), event_id: str(r, "event_id"),
+        project_id: str(r, "project_id"), user_id: str(r, "user_id"),
+        body: str(r, "body"), created_at: str(r, "created_at"),
+      }));
   }
 }
 
@@ -112,6 +124,8 @@ const EXPORT_SOURCE: Record<ExportDataset, { table: string; order: string }> = {
   "scores-normalized": { table: "scores", order: "created_at, id" },
   rankings: { table: "scores", order: "created_at, id" },
   audit: { table: "audit_logs", order: "created_at, id" },
+  votes: { table: "community_votes", order: "created_at, id" },
+  comments: { table: "project_comments", order: "created_at, id" },
 };
 
 async function scopedIds(table: string, eventId: string, ids: string[]): Promise<Set<string>> {
@@ -217,11 +231,90 @@ export async function runImport(
           );
         }
       } else {
-        for (let i = 0; i < rows.length; i++)
-          await client.query(
-            "INSERT INTO scores (event_id, project_id, judge_user_id, value) VALUES ($1,$2,$3,$4)",
-            [eventId, rows[i]?.["project_id"], rows[i]?.["judge_user_id"], values[i]],
+        // Scores import: resolve-or-create the required judge_assignment
+        // inside the same transaction, then insert the score with
+        // assignment_id (scores.assignment_id is NOT NULL + FK).
+        //
+        // Choice: auto-create a missing ACTIVE assignment rather than
+        // failing with unknown_assignment. Rationale: export->import
+        // roundtrip onto a clean event (assignments wiped, scores
+        // re-imported) must work, and Phase 2 already validated that the
+        // project belongs to this event and the judge user exists, so the
+        // judge/project relationship is preserved. Track scope is left
+        // NULL (unscoped) exactly as a fresh organizer-created assignment
+        // would be. All-or-nothing: any row error rolls everything back.
+        let rubricVersion = 1;
+        try {
+          const rr = await client.query(
+            `SELECT version FROM rubric_versions WHERE event_id = $1 AND is_active = true LIMIT 1`,
+            [eventId],
           );
+          if (rr.rows[0] && Number.isFinite(Number((rr.rows[0] as { version: unknown }).version)))
+            rubricVersion = Number((rr.rows[0] as { version: unknown }).version);
+        } catch {
+          rubricVersion = 1; // table missing/unreadable → default preserves behavior
+        }
+        const rowErrors: RowReport[] = [];
+        for (let i = 0; i < rows.length; i++) {
+          const pid = String(rows[i]?.["project_id"] ?? "");
+          const jid = String(rows[i]?.["judge_user_id"] ?? "");
+          let assignmentId: string | undefined;
+          const found = await client.query(
+            `SELECT id, status FROM judge_assignments WHERE event_id = $1 AND project_id = $2 AND judge_user_id = $3 LIMIT 1`,
+            [eventId, pid, jid],
+          );
+          const existing = found.rows[0] as { id: string; status: string } | undefined;
+          if (existing) {
+            assignmentId = String(existing.id);
+          } else {
+            try {
+              const created = await client.query(
+                `INSERT INTO judge_assignments (event_id, project_id, judge_user_id, status) VALUES ($1,$2,$3,'active') RETURNING id`,
+                [eventId, pid, jid],
+              );
+              assignmentId = String((created.rows[0] as { id: string }).id);
+            } catch (insErr: unknown) {
+              if (pgCode(insErr) === "23505") {
+                // Concurrent import created it first — re-resolve.
+                const retry = await client.query(
+                  `SELECT id FROM judge_assignments WHERE event_id = $1 AND project_id = $2 AND judge_user_id = $3 LIMIT 1`,
+                  [eventId, pid, jid],
+                );
+                const rrow = retry.rows[0] as { id: string } | undefined;
+                if (rrow) assignmentId = String(rrow.id);
+              }
+              if (!assignmentId) throw insErr;
+            }
+          }
+          const dup = await client.query(
+            `SELECT 1 FROM scores WHERE assignment_id = $1 AND is_current = true LIMIT 1`,
+            [assignmentId],
+          );
+          if ((dup.rowCount ?? 0) > 0) {
+            rowErrors.push({ row: i + 1, errors: ["duplicate_score"] });
+            continue;
+          }
+          try {
+            await client.query(
+              "INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, version, rubric_version) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+              [assignmentId, eventId, pid, jid, values[i], 1, rubricVersion],
+            );
+          } catch (scoreErr: unknown) {
+            if (pgCode(scoreErr) === "42703") {
+              // Older DB without scores.rubric_version (pre-0013): retry bare.
+              await client.query(
+                "INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, version) VALUES ($1,$2,$3,$4,$5,$6)",
+                [assignmentId, eventId, pid, jid, values[i], 1],
+              );
+            } else throw scoreErr;
+          }
+        }
+        if (rowErrors.length > 0) {
+          try {
+            await client.query("ROLLBACK");
+          } catch { /* keep row errors */ }
+          return { imported: 0, errors: rowErrors };
+        }
       }
       await client.query("COMMIT");
     } catch (err: unknown) {
@@ -230,6 +323,8 @@ export async function runImport(
       } catch { /* keep original error */ }
       if (isMissingTable(err)) return { error: "not_found" };
       if (pgCode(err) === "23503") return { error: "invalid_reference" };
+      if (pgCode(err) === "23505")
+        return { imported: 0, errors: [{ row: 1, errors: ["duplicate"] }] };
       throw err;
     }
     return { imported: rows.length, errors: [] };
@@ -274,6 +369,8 @@ export default async function exportRoutes(app: FastifyInstance): Promise<void> 
     if ("error" in out)
       return reply.code(out.error === "not_found" ? 404 : 422).send({ error: out.error });
     await emit(req, { eventId, action: "admin.action", resourceType: "event", resourceId: eventId, detail: { dataset: ds, imported: out.imported } });
+    if (out.errors.some((e) => e.errors.some((c) => c === "duplicate" || c === "duplicate_score" || c === "assignment_exists")))
+      return reply.code(409).send(out);
     return reply.send(out);
   });
 }

@@ -8,6 +8,7 @@ import { pool } from "../db/index.js";
 import { fetchActiveRubric } from "./rubrics.js";
 import { requireAuth, requireEventRole, requireAssignment, requireTrackScope } from "../authz/guards.js";
 import { appendAuditForRequest, type PoolLike } from "../lib/audit.js";
+import { fanoutWebhooks } from "../lib/webhooks.js";
 
 /** Best-effort audit emit: logs and never fails the primary mutation. */
 async function emit(req: FastifyRequest, entry: Omit<Parameters<typeof appendAuditForRequest>[2], "actorUserId">): Promise<void> {
@@ -15,6 +16,35 @@ async function emit(req: FastifyRequest, entry: Omit<Parameters<typeof appendAud
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Minimal email shape check — rejects garbage before it hits the database. */
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** System roles allowed to judge: judge/organizer/admin (never participant). */
+export function isJudgeSystemRole(role: unknown): boolean {
+  return role === "judge" || role === "organizer" || role === "admin";
+}
+export interface JudgeInviteInput { userId?: string; email?: string; trackId?: string | null }
+/**
+ * Validate a judge-invite body. Accepts {user_id}|{judge_user_id} or {email}
+ * plus optional {track_id}. Returns {input} on success, else {error} with the
+ * 422 error code to send (missing_judge | malformed_judge_id |
+ * malformed_email | malformed_track_id).
+ */
+export function parseJudgeInviteBody(body: Record<string, unknown>): { input?: JudgeInviteInput; error?: string } {
+  const userId = pick(body.user_id ?? body.judge_user_id ?? body.judgeUserId ?? body.judge_id ?? body.judgeId);
+  const email = pick(body.email);
+  const trackRaw = pick(body.track_id ?? body.trackId);
+  if (trackRaw !== undefined && !UUID_RE.test(trackRaw)) return { error: "malformed_track_id" };
+  const trackId = trackRaw ?? null;
+  if (userId !== undefined) {
+    if (!UUID_RE.test(userId)) return { error: "malformed_judge_id" };
+    return { input: { userId, trackId } };
+  }
+  if (email !== undefined) {
+    if (!EMAIL_RE.test(email)) return { error: "malformed_email" };
+    return { input: { email, trackId } };
+  }
+  return { error: "missing_judge" };
+}
 interface AssignmentRow { id: string; event_id: string; project_id: string; judge_user_id: string; track_id: string | null; status: string }
 interface ScoreRow { id: string; assignment_id: string; event_id: string; project_id: string; judge_user_id: string; value: string | number; version: number; supersedes_id: string | null; is_current: boolean; rubric_version: number | null }
 interface Ctx { a: AssignmentRow; projectTrack: string | null }
@@ -87,9 +117,22 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
       const t = await pool.query(`SELECT 1 FROM tracks WHERE id = $1 AND event_id = $2`, [trackRaw, eventId]);
       if ((t.rowCount ?? 0) === 0) return reply.code(422).send({ error: "invalid_track" });
     }
-    if (((await pool.query(`SELECT 1 FROM users WHERE id = $1`, [judgeId])).rowCount ?? 0) === 0) {
+    const judgeRow = (await pool.query<{ role: string }>(`SELECT role FROM users WHERE id = $1`, [judgeId])).rows[0];
+    if (!judgeRow) {
       return reply.code(404).send({ error: "not_found" });
     }
+    if (!isJudgeSystemRole(judgeRow.role)) {
+      return reply.code(422).send({ error: "not_a_judge" });
+    }
+    // Auto-ensure judge membership so the judge queue (GET /events/:eventId/judge)
+    // and GET /api/assignments/mine — both of which JOIN event_memberships —
+    // work on fresh events without a separate invite call. ON CONFLICT DO NOTHING
+    // never overwrites an existing membership (e.g. organizer stays organizer).
+    // Explicit invites remain available via POST /api/events/:eventId/judges.
+    await pool.query(
+      `INSERT INTO event_memberships (event_id, user_id, role, track_id) VALUES ($1, $2, 'judge', $3) ON CONFLICT (event_id, user_id) DO NOTHING`,
+      [eventId, judgeId, trackRaw ?? null],
+    );
     try {
       const ins = await pool.query<AssignmentRow>(`INSERT INTO judge_assignments (event_id, project_id, judge_user_id, track_id) VALUES ($1, $2, $3, $4) RETURNING *`, [eventId, projectId, judgeId, trackRaw ?? null]);
       const row = ins.rows[0];
@@ -98,6 +141,44 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(201).send(row);
     } catch (err) {
       if (pgCode(err) === "23505") return reply.code(409).send({ error: "assignment_exists" });
+      if (pgCode(err) === "23503") return reply.code(404).send({ error: "not_found" });
+      throw err;
+    }
+  });
+  const inviteParamEvent = (req: FastifyRequest): string | undefined => (req.params as { eventId?: string }).eventId;
+  const inviteJudgeGuard = requireEventRole(inviteParamEvent, "organizer");
+  app.post("/api/events/:eventId/judges", { preHandler: [inviteJudgeGuard] }, async (req, reply) => {
+    const { eventId } = req.params as { eventId: string };
+    const parsed = parseJudgeInviteBody(bodyOf(req));
+    if (!parsed.input) return reply.code(422).send({ error: parsed.error ?? "malformed_judge_id" });
+    const { userId, email, trackId } = parsed.input;
+    const target = userId !== undefined
+      ? (await pool.query<{ id: string; role: string }>(`SELECT id, role FROM users WHERE id = $1`, [userId])).rows[0]
+      : (await pool.query<{ id: string; role: string }>(`SELECT id, role FROM users WHERE email = $1`, [email])).rows[0];
+    if (!target) return reply.code(404).send({ error: "not_found" });
+    if (!isJudgeSystemRole(target.role)) return reply.code(422).send({ error: "not_a_judge" });
+    if (((await pool.query(`SELECT 1 FROM events WHERE id = $1`, [eventId])).rowCount ?? 0) === 0) {
+      return reply.code(404).send({ error: "not_found" });
+    }
+    if (trackId !== null) {
+      const t = await pool.query(`SELECT 1 FROM tracks WHERE id = $1 AND event_id = $2`, [trackId, eventId]);
+      if ((t.rowCount ?? 0) === 0) return reply.code(422).send({ error: "invalid_track" });
+    }
+    const existing = (await pool.query<{ role: string }>(
+      `SELECT role FROM event_memberships WHERE event_id = $1 AND user_id = $2`, [eventId, target.id],
+    )).rows[0];
+    if (existing) return reply.code(409).send({ error: "already_member" });
+    try {
+      const ins = await pool.query(
+        `INSERT INTO event_memberships (event_id, user_id, role, track_id) VALUES ($1, $2, 'judge', $3) RETURNING *`,
+        [eventId, target.id, trackId],
+      );
+      const row = ins.rows[0];
+      if (!row) return reply.code(500).send({ error: "create_failed" });
+      await emit(req, { eventId, action: "judge.invite", resourceType: "membership", resourceId: row.id, detail: { judgeId: target.id } });
+      return reply.code(201).send(row);
+    } catch (err) {
+      if (pgCode(err) === "23505") return reply.code(409).send({ error: "already_member" });
       if (pgCode(err) === "23503") return reply.code(404).send({ error: "not_found" });
       throw err;
     }
@@ -141,6 +222,7 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
       await client.query("COMMIT");
       if (!row) return reply.code(500).send({ error: "create_failed" });
       await emit(req, { eventId: row.event_id, action: "score.submit", resourceType: "score", resourceId: row.id, detail: { assignmentId, value } });
+      await fanoutWebhooks(pool as unknown as PoolLike, { type: "score.submit", eventId: row.event_id, data: { score_id: row.id, project_id: row.project_id, value: Number(row.value) } });
       return reply.code(201).send(outScore(row));
     } catch (err) { await safeRollback(client); throw err; } finally { client.release(); }
   });

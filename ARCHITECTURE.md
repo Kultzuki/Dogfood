@@ -54,10 +54,13 @@ analytics, or telemetry are required.
 | `tracks.ts` | Track/prize CRUD per event (`POST/GET/PATCH/DELETE /api/events/:eventId/tracks…`, same for `prizes…`). |
 | `teams.ts` | Invite-link teams: organizer create (`POST /api/events/:eventId/teams`), token join (`POST …/teams/join`, transactional size cap), token rotation (`PATCH …/rotate`). |
 | `projects.ts` | JSON project API: draft create, edit, submit (server-time deadline `now() <= submissions_close_at`), read, version history. |
-| `gallery.ts` | Public `GET /gallery` (search `q`, `track` UUID-validated, `tag`); organizer question admin; team-member custom answers. |
+| `gallery.ts` | Public `GET /gallery` (search `q`, `track` UUID-validated, `tag`); framing-friendly `GET /gallery/embed` (per-route CSP `frame-ancestors *`, no nav/forms/scripts); organizer question admin; team-member custom answers. |
 | `scores.ts` | Assignments (`POST /api/assignments`) + scores with rescore chain; owner isolation via 404 (never 403). |
 | `rubrics.ts` | Weighted rubrics: `GET /api/events/:eventId/rubric` (active weights), `POST …/rubrics` (organizer-only new version, weights sum to 100). |
 | `community.ts` | T3 community voting + comments JSON API: `POST /api/projects/:id/vote` (auth, in-window, one vote per project per user), `GET …/votes` (counts; 404 for non-organizers while voting is active), `GET/POST …/comments` (public list, authenticated create, 1–2000 chars), `POST /api/events/:id/voting-window` (organizer-only window config). Ballot order is `sha256(userId&#124;projectId)` sort — deterministic per voter, stable on refresh. |
+| `webhooks.ts` | T4 per-event webhook subscriptions: CRUD + delivery inspection + explicit retry + on-demand sweep (`POST …/webhooks/process`). Outbox-backed at-least-once delivery, HMAC-signed bodies, fail-closed SSRF guard. Best-effort fanout on vote/comment/score/submit/certificate events (never blocks the trigger). |
+| `certificates.ts` | T4 offline records: `POST /api/events/:eventId/certificates` (organizer, idempotent per event/type/subject), public `GET /api/certificates/:id`, public `GET …/verify` (stored record + `?payload=` tamper check), `GET /api/records/pubkey`, printable `GET /certificates/:id`. Ed25519 over canonical JSON; digest pinned per row. |
+| `api.ts` | T4 REST index: static `GET /api` endpoint map (no DB, public). |
 | `acceptance.ts` | Checker aliases only (no new business logic): `POST /projects/new` (deadline probe), `GET /api/judge/scores[?judge=]` (403-mapped isolation probe), `GET /api/export.csv` (organizer CSV probe). |
 | `exports.ts` | Organizer CSV hub (`GET /api/events/:eventId/export?dataset=…`) + all-or-nothing row import (`POST …/import`). |
 | `audit.ts` | Organizer audit read (`GET /api/events/:eventId/audit`). |
@@ -69,6 +72,8 @@ analytics, or telemetry are required.
 |----------|---------|
 | `layout.njk` | Base HTML shell: header, nav, main, footer. Links only `/static/css/main.css`. |
 | `login.njk` | Login form extending layout. Hidden `_csrf` field. BEM classes. |
+| `embed.njk` | Standalone widget document (no layout/nav/forms/scripts) for `/gallery/embed`. Links `main.css` same-origin; anchors open out (`target=_blank`). |
+| `certificate.njk` | Printable public certificate view: subject, facts table, digest, signature, verify link. |
 
 ### Static Assets (`static/`)
 
@@ -106,7 +111,17 @@ Request
 ## Security Model
 
 - **CSP**: `default-src 'self'`; no inline scripts, no external resources.
+  Single exception: `GET /gallery/embed` sets per-route `frame-ancestors *`
+  (public read-only content, no session actions); everything else keeps
+  `frame-ancestors 'none'`.
 - **Session**: HMAC-signed cookie; httpOnly + SameSite=Lax.
+- **Record signing**: deployment Ed25519 keypair (`RECORD_SIGNING_KEY` env or
+  `data/` file, 0600, gitignored). Public verification needs only the pubkey;
+  rotation invalidates old records (pinned `kid`).
+- **Webhooks**: fail-closed SSRF guard (http/https, no credentials, resolved
+  IPs outside loopback/RFC1918/link-local, no redirects); per-subscription
+  HMAC body signatures; loopback allowed only with
+  `ALLOW_LOOPBACK_WEBHOOKS=1` (dev/test).
 - **CSRF**: Token stored in session, submitted via header or hidden form field.
 - **Transport**: HSTS with 1-year max-age; referrer policy strict-origin-when-cross-origin.
 - **Authorization**: Server-side enforced; frontend visibility is never an authorization boundary.

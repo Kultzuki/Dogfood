@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dogfood gallery widget</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+  <main class="main">
+    <div class="container">
+      {% if projects and projects.length > 0 %}
+      <ul class="gallery-grid">
+        {% for p in projects %}
+        <li class="card card--page project-card">
+          <div class="card__header">
+            <h2 class="card__title project-card__title"><a href="/gallery/{{ p.id }}" target="_blank" rel="noopener">{{ p.title }}</a></h2>
+            {% if p.tagline %}
+            <p class="text-muted">{{ p.tagline }}</p>
+            {% endif %}
+          </div>
+          <div class="card__body">
+            {% if p.tech_tags and p.tech_tags.length > 0 %}
+            <ul class="tag-list" aria-label="Tech tags">
+              {% for t in p.tech_tags %}
+              <li class="tag">{{ t }}</li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+            <p class="form__help mt-2">{{ p.event_name }}</p>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty-state">
+        <p class="empty-state__title">No submitted projects found.</p>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>

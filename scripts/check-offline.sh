@@ -1,8 +1,11 @@
 #!/bin/sh
-# check-offline.sh — CI guard: fail if templates/, static/, or src/ contain
-# references to external CDNs, webfonts, or remote URLs.
+# check-offline.sh — CI guard: fail if templates/, static/, or shipped src/
+# contain references to external CDNs, webfonts, or remote URLs.
 #
 # Allowed: https://opencode.ai in comments only (schema reference).
+# Allowed: *.test.ts fixtures (webhook SSRF-guard tests use example URLs;
+#   test files never execute in the browser and perform no network I/O
+#   beyond local resolver calls).
 # Policy: the platform must start and render with network disabled.
 
 set -eu
@@ -20,6 +23,7 @@ for DIR in templates static src; do
       --exclude='*.md' \
       --exclude='*.lock' \
       --exclude='*.svg' \
+      --exclude='*.test.ts' \
       2>/dev/null || true)
 
     if [ -n "$MATCHES" ]; then

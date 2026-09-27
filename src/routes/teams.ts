@@ -81,8 +81,17 @@ function parseMaxSize(v: unknown): number | undefined {
   return v;
 }
 
+/**
+ * Browser-openable invite link handed to organizers.
+ *
+ * The join PAGE is `GET /events/:eventId/teams/join` (see
+ * src/routes/pages/participantTeams.ts). The JSON sibling
+ * `POST /api/events/:eventId/teams/join` is not a link a human can open —
+ * GETting the /api path 404s, so pointing invite_url at it shipped every
+ * organizer a dead link.
+ */
 function inviteUrl(eventId: string, token: string): string {
-  return `/api/events/${eventId}/teams/join?token=${token}`;
+  return `/events/${eventId}/teams/join?token=${token}`;
 }
 
 export default async function teamRoutes(app: FastifyInstance): Promise<void> {

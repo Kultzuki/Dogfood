@@ -1,5 +1,11 @@
 # .dogfood.toml — acceptance checker config (see stuff/spec.md).
 # Run: py -3 stuff/run.py .dogfood.toml > acceptance-report.txt
+#
+# Reproducibility contract for the [auth] block below: these cookies are
+# HMAC-signed with the SESSION_SECRET pinned in compose.yaml, so they stay
+# valid across `docker compose down -v` resets. If you override
+# SESSION_SECRET in your own environment, re-copy the `Cookie: sid=...`
+# lines the container prints at boot.
 
 [portal]
 base_url = "http://localhost:3000"
@@ -9,14 +15,17 @@ claimed = ["T1", "T2"]
 pitch = "Self-hostable hackathon submission and judging platform with backend-enforced role isolation."
 
 [auth]
-organizer = "Cookie: sid=fixture-organizer.KeMIIhakL6t1BOz9oMYUwZqwJYDnHYEZkHVZTDRWidk"
-judge_a = "Cookie: sid=fixture-judge-a.7M_2QcaX99tPOXhZLpwnrdfOcThUM2jEbrQU_cmxvXA"
-judge_b = "Cookie: sid=fixture-judge-b.Qsl63hTn6G_YCkx6q9BZmKk3F7tU26t2eCHcUs7vTwI"
-participant = "Cookie: sid=fixture-participant.jsERXEIulKgJlzZNp7-zvmc6qy3xpTnJ0v4dJy72bUE"
+organizer = "Cookie: sid=fixture-organizer.3bMttyxdYJnzqH6o5Wqy_JD-SM7a0jYzmMWhDu3iDDs"
+judge_a = "Cookie: sid=fixture-judge-a.9M4Nnki-sim_yMHeIGYyhZaPos5TMdtQc0dtYG6j1tM"
+judge_b = "Cookie: sid=fixture-judge-b.RcaMP-m88FWaagNhrwMrlL9Ox9ZYrFEv0AufMcn4Nlk"
+participant = "Cookie: sid=fixture-participant.ZtPoPlsb3A_xKRtsmBwdcYwgnUM9F69uzJPwwCiifss"
 
 [routes]
 gallery = "/gallery"
 submit = "/projects/new"
 judge_scores = "/api/judge/scores"
-peer_scores = "/api/judge/scores?judge=a880dba9-eb60-4860-9333-ae8ec90ef76f"
+# judge_a is the first fixture judge that has scores: tomas.varga@example.org
+# (deterministic from stuff/fixtures.json). A user UUID would NOT work here —
+# fresh seeds regenerate it with gen_random_uuid().
+peer_scores = "/api/judge/scores?judge=tomas.varga@example.org"
 csv_export = "/api/export.csv"

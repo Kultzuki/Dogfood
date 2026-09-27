@@ -1,0 +1,42 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">Certificate of Record</h1>
+    <p class="text-muted text-center">{{ cert.event_id }}</p>
+  </div>
+
+  <div class="card__body">
+    <p class="detail-meta">
+      <span class="badge badge--scored">{{ cert.type }}</span>
+      <span class="badge">key {{ cert.kid }}</span>
+    </p>
+    <div class="table-wrapper mt-4">
+      <table class="table">
+        <tbody>
+          <tr class="table__row">
+            <th class="table__header-cell" scope="row">Subject</th>
+            <td class="table__cell">{{ cert.payload.subject.name or cert.payload.subject.title or cert.subject_id }}</td>
+          </tr>
+          {% for key, value in cert.payload.facts %}
+          <tr class="table__row">
+            <th class="table__header-cell" scope="row">{{ key }}</th>
+            <td class="table__cell">{{ value }}</td>
+          </tr>
+          {% endfor %}
+          <tr class="table__row">
+            <th class="table__header-cell" scope="row">Digest (SHA-256)</th>
+            <td class="table__cell">{{ cert.digest }}</td>
+          </tr>
+          <tr class="table__row">
+            <th class="table__header-cell" scope="row">Signature (Ed25519)</th>
+            <td class="table__cell">{{ cert.signature }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="detail-back"><a href="/api/certificates/{{ cert.id }}/verify">Verify this record</a> · <a href="/gallery">Back to gallery</a></p>
+  </div>
+</div>
+{% endblock %}

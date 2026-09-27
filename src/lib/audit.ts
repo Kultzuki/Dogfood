@@ -48,6 +48,9 @@ export const AUDIT_ACTIONS = [
   "vote.cast",
   "voting.window",
   "comment.create",
+  "webhook.create",
+  "webhook.delete",
+  "certificate.issue",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

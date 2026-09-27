@@ -77,6 +77,56 @@ function checkQuestionBody(b: Record<string, unknown>): string | null {
 }
 
 export default async function galleryRoutes(app: FastifyInstance): Promise<void> {
+  // ── Embeddable public gallery widget (no auth) ─────────────────────
+  // Same visibility rules as /gallery (submitted projects in showcase
+  // states, same searchGallery query). Framing-friendly on purpose: this
+  // is the ONLY route whose CSP permits framing (frame-ancestors *),
+  // because the content is public read-only data with no session actions.
+  // The template carries no nav, no forms, and no scripts.
+  app.get(
+    "/gallery/embed",
+    {
+      helmet: {
+        frameguard: false,
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            baseUri: ["'self'"],
+            styleSrc: ["'self'"],
+            imgSrc: ["'self'", "data:"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            frameAncestors: ["*"],
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const query = (req.query ?? {}) as Record<string, unknown>;
+      const q = typeof query.q === "string" ? query.q : "";
+      const tag = typeof query.tag === "string" ? query.tag : "";
+      const track = typeof query.track === "string" ? query.track : "";
+      const trackId = track && UUID_RE.test(track) ? track : undefined;
+      const rawLimit = Number(query["limit"]);
+      const limit = Number.isFinite(rawLimit)
+        ? Math.min(Math.max(Math.floor(rawLimit), 1), 50)
+        : 12;
+      try {
+        const projects = await searchGallery({
+          q,
+          trackId,
+          tag: tag || undefined,
+          limit,
+        });
+        return reply.view("embed.njk", { q, tag, projects, limit });
+      } catch {
+        return reply
+          .code(503)
+          .view("embed.njk", { q, tag, projects: [], limit });
+      }
+    },
+  );
+
   // ── Public gallery (no auth) ─────────────────────────────────────
   app.get("/gallery", async (req, reply) => {
     const query = (req.query ?? {}) as Record<string, unknown>;

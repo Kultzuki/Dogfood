@@ -87,6 +87,8 @@ trail. Clock skew and the missing override are accepted v1 gaps.
 | Vote burst throttle 60/h + per-user velocity cap 100/h + audit `vote.cast` | `src/routes/community.ts`, `src/lib/rateLimit.ts` | Excessive voting / ballot stuffing signals (2, partial) |
 | Counts 404 while voting is active (organizers only) | `src/routes/community.ts` | Hidden-result bypass (2) |
 | Comment throttle 30/10min + attribution + audit `comment.create` | `src/routes/community.ts` | Comment spam friction (2, partial) |
+| Webhook SSRF guard + HMAC signatures + organizer-only config | `src/lib/webhooks.ts`, `src/routes/webhooks.ts` | Webhook abuse / exfiltration via event system (new surface) |
+| Ed25519 record keys gitignored + rotation documented | `src/lib/signing.ts`, `.gitignore` | Record-forgery after key leak (partial — single-deploy trust, no PKI) |
 
 ## Explicitly not claimed
 

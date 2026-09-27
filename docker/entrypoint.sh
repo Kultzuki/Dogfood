@@ -57,6 +57,14 @@ echo "🌱 Seeding official fixtures..."
 node dist/db/seed-fixtures.js
 echo "✅ Fixture seed complete."
 
+# ── Local/demo test accounts (no-op unless DOGFOOD_DEMO_ACCOUNTS=1) ────
+# Creates four password-loginable demo identities for manual browser QA.
+# They are NOT the acceptance fixture identities and are never referenced by
+# .dogfood.toml. Set DOGFOOD_DEMO_ACCOUNTS=0 (or omit) on any real deployment.
+echo "🧪 Seeding demo test accounts (gated by DOGFOOD_DEMO_ACCOUNTS)..."
+node dist/db/seed-demo.js
+echo "✅ Demo account seed step complete."
+
 # ── Start application ───────────────────────────────────────────────
 echo "🚀 Starting application..."
 exec node dist/server.js

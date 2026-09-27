@@ -20,6 +20,8 @@ import {
   type ProjectInfo,
 } from "./participantShared.js";
 import { loadProject } from "./participantProjectForm.js";
+import { fanoutWebhooks } from "../../lib/webhooks.js";
+import type { PoolLike } from "../../lib/audit.js";
 
 type ProjectParams = { eventId: string; projectId: string };
 
@@ -123,6 +125,11 @@ export async function registerParticipantSubmitPages(
     } finally {
       client.release();
     }
+    await fanoutWebhooks(pool as unknown as PoolLike, {
+      type: "project.submitted",
+      eventId,
+      data: { project_id: projectId },
+    });
     setFlash(req, "success", "Project submitted.");
     return reply.code(302).redirect(`/events/${eventId}/projects/${projectId}/edit`);
   });

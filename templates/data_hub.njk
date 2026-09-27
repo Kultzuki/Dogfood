@@ -33,6 +33,10 @@
         <p class="form__help">Final ordered rankings, same columns as normalized.</p>
         {% elif d == "audit" %}
         <p class="form__help">Hash-chained audit trail for this event.</p>
+        {% elif d == "votes" %}
+        <p class="form__help">Community votes: one row per counted vote (no unvote — rows are never edited).</p>
+        {% elif d == "comments" %}
+        <p class="form__help">Project comments with authoring user and timestamp.</p>
         {% endif %}
       </li>
       {% endfor %}
