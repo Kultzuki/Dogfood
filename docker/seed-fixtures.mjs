@@ -138,6 +138,19 @@ async function main() {
     {
       const cnt = await q(`SELECT COUNT(*)::int AS n FROM projects WHERE event_id = $1`, [eventId]);
       if (Number(cnt.rows[0]?.n ?? 0) > 0) {
+        // Reconcile authorization scopes on existing fixture installations too.
+        for (const j of fx.judges ?? []) {
+          if (!j.email) continue;
+          const userId = userIds.get(String(j.email).toLowerCase());
+          const m = await q(`SELECT id FROM event_memberships WHERE event_id = $1 AND user_id = $2 AND role = 'judge'`, [eventId, userId]);
+          if (!m.rows[0]) continue;
+          await q(`UPDATE event_memberships SET track_id = NULL, track_scope_all = FALSE WHERE id = $1`, [m.rows[0].id]);
+          await q(`DELETE FROM event_membership_tracks WHERE membership_id = $1`, [m.rows[0].id]);
+          for (const fixtureTrack of j.tracks ?? []) {
+            const track = await q(`SELECT id FROM tracks WHERE event_id = $1 AND slug = $2`, [eventId, fixtureTrack]);
+            if (track.rows[0]) await q(`INSERT INTO event_membership_tracks (membership_id, track_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [m.rows[0].id, track.rows[0].id]);
+          }
+        }
         const scoredOrder0 = [];
         for (const s of fx.scores ?? []) {
           if (!scoredOrder0.includes(s.judge)) scoredOrder0.push(s.judge);
@@ -180,7 +193,7 @@ async function main() {
       }
     }
 
-    // ── Memberships (upsert; judges unscoped track_id = NULL) ─────────
+    // ── Memberships (judge scopes are populated explicitly below) ─────
     async function membership(email, role) {
       await q(
         `INSERT INTO event_memberships (event_id, user_id, role, track_id)
@@ -216,6 +229,14 @@ async function main() {
       );
       trackIds.set(t.id, r.rows[0].id);
     }
+    for (const j of fx.judges ?? []) {
+      if (!j.email) continue;
+      const membershipRow = await q(`SELECT id FROM event_memberships WHERE event_id = $1 AND user_id = $2`, [eventId, userIds.get(String(j.email).toLowerCase())]);
+      for (const fixtureTrack of j.tracks ?? []) {
+        const trackId = trackIds.get(fixtureTrack);
+        if (trackId && membershipRow.rows[0]) await q(`INSERT INTO event_membership_tracks (membership_id, track_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [membershipRow.rows[0].id, trackId]);
+      }
+    }
 
     const teamIds = new Map();
     for (const t of fx.teams ?? []) {
@@ -240,11 +261,27 @@ async function main() {
       const teamId = teamIds.get(p.team);
       if (!teamId) continue;
       const r = await q(
-        `INSERT INTO projects (event_id, team_id, track_id, title, tagline, description, tech_tags, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, NULL, $5, '{}', 'submitted', $6, $6) RETURNING id`,
-        [eventId, teamId, trackIds.get(p.track) ?? null, p.title, p.summary ?? "", p.submitted_at ?? new Date().toISOString()],
+        `INSERT INTO projects (event_id, team_id, track_id, title, tagline, description, repo_url, demo_url, tech_tags, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, '{}', 'submitted', $8, $8) RETURNING id`,
+        [eventId, teamId, trackIds.get(p.track) ?? null, p.title, p.summary ?? "", p.repo_url ?? null, p.demo_url ?? null, p.submitted_at ?? new Date().toISOString()],
       );
       projectIds.set(p.id, r.rows[0].id);
+    }
+
+    const duplicateKeys = new Map();
+    const duplicateIds = new Set();
+    for (const p of fx.projects ?? []) {
+      const repo = String(p.repo_url ?? "").trim().toLowerCase().replace(/\/$/, "");
+      const title = String(p.title ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+      const keys = [
+        ...(repo ? [`${p.team}\u0000repo:${repo}`] : []),
+        ...(title ? [`${p.team}\u0000title:${title}`] : []),
+      ];
+      const first = keys.map((key) => duplicateKeys.get(key)).find(Boolean);
+      if (first) {
+        duplicateIds.add(p.id);
+        await q(`UPDATE projects SET duplicate_of_project_id = $1, needs_review = true WHERE id = $2 AND event_id = $3`, [projectIds.get(first), projectIds.get(p.id), eventId]);
+      } else for (const key of keys) duplicateKeys.set(key, p.id);
     }
 
     // judge_a / judge_b: first two fixture judges (file order) with scores.
@@ -261,6 +298,7 @@ async function main() {
 
     let scoreCount = 0;
     for (const s of fx.scores ?? []) {
+      if (duplicateIds.has(s.project)) continue;
       const judgeUserId = judgeUserByFixtureId.get(s.judge);
       const projectId = projectIds.get(s.project);
       if (!judgeUserId || !projectId) continue;

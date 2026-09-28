@@ -82,11 +82,11 @@ export async function registerParticipantProjectPages(
     // DB-clock deadline gate (mirrors edit/submit): NULL submissions_close_at = open.
     {
       const dl = await pool.query(
-        "SELECT ((submissions_open_at IS NULL OR now() >= submissions_open_at) AND (submissions_close_at IS NULL OR now() <= submissions_close_at)) AS open FROM events WHERE id = $1",
+        "SELECT state, ((submissions_open_at IS NULL OR now() >= submissions_open_at) AND (submissions_close_at IS NULL OR now() <= submissions_close_at)) AS open FROM events WHERE id = $1",
         [eventId],
       );
       if ((dl.rowCount ?? 0) === 0) return reply.code(404).send({ error: "not_found" });
-      if (!(dl.rows[0] as { open: boolean }).open) {
+      if ((dl.rows[0] as { state: string; open: boolean }).state !== "SUBMISSIONS_OPEN" || !(dl.rows[0] as { open: boolean }).open) {
         await fail("The submission deadline has passed.");
         return;
       }
@@ -97,10 +97,10 @@ export async function registerParticipantProjectPages(
       await client.query("BEGIN");
       try {
         const ins = await client.query<ProjectInfo>(
-          `INSERT INTO projects (event_id, team_id, track_id, title, tagline, description, tech_tags)
-           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+          `INSERT INTO projects (event_id, team_id, track_id, title, tagline, description, tech_tags, repo_url, demo_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
           [eventId, team.id, parsed.values.trackId || null, parsed.values.title,
-            parsed.values.tagline, parsed.values.description, parsed.techTags],
+            parsed.values.tagline, parsed.values.description, parsed.techTags, parsed.values.repoUrl || null, parsed.values.demoUrl || null],
         );
         const row = ins.rows[0];
         if (!row) throw new Error("create_failed");
@@ -179,10 +179,10 @@ export async function registerParticipantProjectPages(
     try {
       await client.query("BEGIN");
       const cur = await client.query(
-        `SELECT p.*, ((SELECT e.submissions_open_at IS NOT NULL AND now() < e.submissions_open_at FROM events e WHERE e.id = p.event_id) OR (SELECT e.submissions_close_at IS NOT NULL AND now() > e.submissions_close_at FROM events e WHERE e.id = p.event_id)) AS past_due
-           FROM projects p WHERE p.id = $1 AND p.event_id = $2 FOR UPDATE`, [projectId, eventId],
+        `SELECT p.*, e.state AS event_state, ((e.submissions_open_at IS NOT NULL AND now() < e.submissions_open_at) OR (e.submissions_close_at IS NOT NULL AND now() > e.submissions_close_at)) AS past_due
+           FROM projects p JOIN events e ON e.id = p.event_id WHERE p.id = $1 AND p.event_id = $2 FOR UPDATE OF p, e`, [projectId, eventId],
       );
-      const row = cur.rows[0] as (ProjectInfo & { past_due: boolean | null }) | undefined;
+      const row = cur.rows[0] as (ProjectInfo & { event_state: string; past_due: boolean }) | undefined;
       if (!row) {
         await safeRollback(client);
         return reply.code(404).send({ error: "not_found" });
@@ -191,7 +191,7 @@ export async function registerParticipantProjectPages(
         await safeRollback(client);
         return reply.code(404).send({ error: "not_found" });
       }
-      if (row.past_due) {
+      if (row.event_state !== "SUBMISSIONS_OPEN" || row.past_due) {
         await safeRollback(client);
         await fail("The submission deadline has passed.");
         return;
@@ -200,9 +200,9 @@ export async function registerParticipantProjectPages(
       try {
         const up = await client.query<ProjectInfo>(
           `UPDATE projects SET title = $1, tagline = $2, description = $3, tech_tags = $4,
-                  track_id = $5, updated_at = now() WHERE id = $6 RETURNING *`,
+                  repo_url = $5, demo_url = $6, track_id = $7, updated_at = now() WHERE id = $8 RETURNING *`,
           [parsed.values.title, parsed.values.tagline, parsed.values.description,
-            parsed.techTags, parsed.values.trackId || null, projectId],
+            parsed.techTags, parsed.values.repoUrl || null, parsed.values.demoUrl || null, parsed.values.trackId || null, projectId],
         );
         const u = up.rows[0];
         if (!u) throw new Error("update_failed");

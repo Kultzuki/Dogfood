@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ALLOWED_TRANSITIONS,
   EVENT_STATES,
+  canWriteJudgeBallot,
   canCreate,
   canRead,
   canTransition,
@@ -11,6 +12,11 @@ import {
 } from "./eventTransitions.js";
 
 describe("EVENT_STATES", () => {
+  it("allows ballot submit and rescore only during JUDGING", () => {
+    expect(canWriteJudgeBallot("JUDGING")).toBe(true);
+    expect(canWriteJudgeBallot("RESULTS_FINAL")).toBe(false);
+    expect(canWriteJudgeBallot("PUBLISHED")).toBe(false);
+  });
   it("contains exactly the 8 lifecycle states in order", () => {
     expect(EVENT_STATES).toEqual([
       "DRAFT",

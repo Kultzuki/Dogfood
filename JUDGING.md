@@ -5,6 +5,15 @@ independently testable: node:stdlib + relative imports only, no randomness,
 no clocks, no I/O, no web/DB imports. Public names: `runPipeline`,
 `hashEntries` (extended, never renamed).
 
+Assignment creation and imports enforce the target judge's event membership
+track scope in the backend. A membership can grant one track, several rows in
+`event_membership_tracks`, or all tracks only through `track_scope_all`;
+NULL is not a wildcard. Projects marked `needs_review` are excluded from
+assignment creation/import and ranking input/output until resolved. Project
+create/edit/submit require event state `SUBMISSIONS_OPEN`; score submit and
+rescore require `JUDGING`, so `RESULTS_FINAL` and `PUBLISHED` are read-only for
+ballots.
+
 ## Pipeline order
 
 `runPipeline(entries, method, excluded?)` executes exactly:

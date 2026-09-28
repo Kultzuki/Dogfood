@@ -44,6 +44,7 @@ export async function buildApp(opts: AppOptions = {}) {
     // Structured JSON logging via pino (default when object passed).
     // request.id set below surfaces as reqId in every log line.
     logger: opts.logger ?? { level: process.env.LOG_LEVEL ?? "info" },
+    trustProxy: process.env.TRUST_PROXY === "true" ? true : process.env.TRUST_PROXY === "false" || !process.env.TRUST_PROXY ? false : process.env.TRUST_PROXY,
   });
 
   // Generate request_id for structured logging if not already present

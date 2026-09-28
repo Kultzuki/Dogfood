@@ -8,7 +8,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "drizzle.config.ts"],
+    ignores: ["dist/**", "node_modules/**", ".kilo/**", "**/.kilo/**", "drizzle.config.ts"],
   },
   // ── TypeScript parser for all .ts files ────────────────────────────
   {
@@ -48,5 +48,11 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": "off",
     },
+  },
+  // CSV/finalization adapters are the single approved boundary into the
+  // pure judging engine; route handlers and ordinary CRUD stay isolated.
+  {
+    files: ["src/lib/csv.ts"],
+    rules: { "no-restricted-imports": "off" },
   },
 );

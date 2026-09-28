@@ -17,8 +17,8 @@
 base_url = "http://localhost:3000"
 
 [tiers]
-claimed = ["T1", "T2"]
-pitch = "Self-hostable hackathon submission and judging platform with backend-enforced role isolation."
+claimed = ["T1"]
+pitch = "Self-hostable hackathon submission portal with public project discovery."
 
 [auth]
 organizer = "Cookie: sid=fixture-organizer.8Q-odhJpG_6OcIwk6or3KVJOvO61ckyML8nMO7ncBXY"

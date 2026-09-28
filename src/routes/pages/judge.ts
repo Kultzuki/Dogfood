@@ -29,6 +29,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import "@fastify/view";
 import { pool } from "../../db/index.js";
+import { canWriteJudgeBallot } from "../../lib/eventTransitions.js";
 import {
   requireAuth,
   requireAssignment,
@@ -210,6 +211,11 @@ export async function registerJudgePages(app: FastifyInstance): Promise<void> {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      const event = (await client.query<{ state: string }>(`SELECT state FROM events WHERE id = (SELECT event_id FROM judge_assignments WHERE id = $1) FOR UPDATE`, [assignmentId])).rows[0];
+      if (!event || !canWriteJudgeBallot(event.state)) {
+        await client.query("ROLLBACK");
+        return reply.code(409).send({ error: "judging_closed" });
+      }
       await client.query(`SELECT pg_advisory_xact_lock(hashtext('score_' || $1))`, [assignmentId]);
       const la = (await client.query<LockRow>(`SELECT * FROM judge_assignments WHERE id = $1 FOR UPDATE`, [assignmentId])).rows[0];
       if (la === undefined || la.judge_user_id !== userId || la.status !== "active") {

@@ -169,9 +169,14 @@ async function eventWindow(
 }
 
 async function votingActive(db: PoolLike, eventId: string): Promise<boolean> {
-  const w = await eventWindow(db, eventId);
-  if (!w) return false;
-  return isVotingActive(w.voting_opens_at, w.voting_closes_at, Date.now());
+  try {
+    const r = await db.query(
+      `SELECT (voting_opens_at IS NOT NULL AND now() >= voting_opens_at
+        AND (voting_closes_at IS NULL OR now() < voting_closes_at)) AS active
+       FROM events WHERE id = $1`, [eventId],
+    );
+    return (r.rows[0] as { active?: boolean } | undefined)?.active === true;
+  } catch { return false; }
 }
 
 async function isOrganizerOrAdmin(

@@ -9,6 +9,7 @@ import { fetchActiveRubric, compositeFor, RUBRIC_KEYS } from "./rubrics.js";
 import { requireAuth, requireEventRole, requireAssignment, requireTrackScope } from "../authz/guards.js";
 import { appendAuditForRequest, type PoolLike } from "../lib/audit.js";
 import { fanoutWebhooks } from "../lib/webhooks.js";
+import { canWriteJudgeBallot } from "../lib/eventTransitions.js";
 
 /** Best-effort audit emit: logs and never fails the primary mutation. */
 async function emit(req: FastifyRequest, entry: Omit<Parameters<typeof appendAuditForRequest>[2], "actorUserId">): Promise<void> {
@@ -90,15 +91,25 @@ async function denyUnless(req: FastifyRequest, reply: FastifyReply, eventId: str
   await requireEventRole(() => eventId, ...roles)(req, reply);
   return reply.sent;
 }
-/** Track scope; null work-track passes only for unscoped members. True = blocked. */
+/** Explicit allowed-track check; NULL is never an implicit wildcard for judges. */
 async function scopeBlocked(req: FastifyRequest, reply: FastifyReply, trackId: string | null): Promise<boolean> {
   if (trackId === null) {
-    const r = await pool.query<{ track_id: string | null }>(`SELECT track_id FROM event_memberships WHERE id = $1`, [req.eventMembershipId]);
-    if (r.rows[0]?.track_id !== null) { await reply.code(404).send({ error: "not_found" }); return true; }
+    if (req.eventRole !== "organizer") { await reply.code(404).send({ error: "not_found" }); return true; }
     return false;
   }
   await requireTrackScope(() => trackId)(req, reply);
   return reply.sent;
+}
+async function judgeHasTrackScope(eventId: string, judgeId: string, trackId: string | null): Promise<boolean> {
+  if (trackId === null) return false;
+  const r = await pool.query(
+    `SELECT 1 FROM event_memberships m
+      WHERE m.event_id = $1 AND m.user_id = $2
+        AND (m.role IN ('organizer','admin') OR (m.role = 'judge' AND (m.track_scope_all OR m.track_id = $3
+          OR EXISTS (SELECT 1 FROM event_membership_tracks mt WHERE mt.membership_id = m.id AND mt.track_id = $3))))
+      LIMIT 1`, [eventId, judgeId, trackId],
+  );
+  return (r.rowCount ?? r.rows.length) > 0;
 }
 async function loadCtx(assignmentId: string): Promise<Ctx | undefined> {
   const r = await pool.query<AssignmentRow & { project_track: string | null }>(`SELECT a.*, p.track_id AS project_track FROM judge_assignments a JOIN projects p ON p.id = a.project_id WHERE a.id = $1`, [assignmentId]);
@@ -122,8 +133,9 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
     if (!projectId || !UUID_RE.test(projectId)) return reply.code(422).send({ error: "malformed_project_id" });
     if (!judgeId || !UUID_RE.test(judgeId)) return reply.code(422).send({ error: "malformed_judge_id" });
     if (trackRaw !== undefined && !UUID_RE.test(trackRaw)) return reply.code(422).send({ error: "malformed_track_id" });
-    const p = await pool.query<{ event_id: string }>(`SELECT event_id FROM projects WHERE id = $1`, [projectId]);
+    const p = await pool.query<{ event_id: string; track_id: string | null; needs_review?: boolean }>(`SELECT event_id, track_id, needs_review FROM projects WHERE id = $1`, [projectId]);
     if (!p.rows[0] || p.rows[0].event_id !== eventId) return reply.code(404).send({ error: "not_found" });
+    if (p.rows[0].needs_review) return reply.code(409).send({ error: "project_needs_review" });
     if (trackRaw !== undefined) {
       const t = await pool.query(`SELECT 1 FROM tracks WHERE id = $1 AND event_id = $2`, [trackRaw, eventId]);
       if ((t.rowCount ?? 0) === 0) return reply.code(422).send({ error: "invalid_track" });
@@ -135,15 +147,27 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
     if (!isJudgeSystemRole(judgeRow.role)) {
       return reply.code(422).send({ error: "not_a_judge" });
     }
+    const projectTrackId = p.rows[0].track_id;
+    const scopedMembership = await pool.query<{ role: string }>(
+      `SELECT role FROM event_memberships WHERE event_id = $1 AND user_id = $2`, [eventId, judgeId],
+    );
+    // A new judge membership is scoped to this project's track. Existing
+    // memberships must already authorize the project and any explicit track.
+    if (scopedMembership.rows.length === 0 && projectTrackId !== null) {
+      await pool.query(
+        `INSERT INTO event_memberships (event_id, user_id, role, track_id) VALUES ($1, $2, 'judge', $3) ON CONFLICT (event_id, user_id) DO NOTHING`,
+        [eventId, judgeId, projectTrackId],
+      );
+    }
+    if (!(await judgeHasTrackScope(eventId, judgeId, projectTrackId)) ||
+        (trackRaw !== undefined && !(await judgeHasTrackScope(eventId, judgeId, trackRaw)))) {
+      return reply.code(422).send({ error: "judge_track_forbidden" });
+    }
     // Auto-ensure judge membership so the judge queue (GET /events/:eventId/judge)
     // and GET /api/assignments/mine — both of which JOIN event_memberships —
     // work on fresh events without a separate invite call. ON CONFLICT DO NOTHING
     // never overwrites an existing membership (e.g. organizer stays organizer).
     // Explicit invites remain available via POST /api/events/:eventId/judges.
-    await pool.query(
-      `INSERT INTO event_memberships (event_id, user_id, role, track_id) VALUES ($1, $2, 'judge', $3) ON CONFLICT (event_id, user_id) DO NOTHING`,
-      [eventId, judgeId, trackRaw ?? null],
-    );
     try {
       const ins = await pool.query<AssignmentRow>(`INSERT INTO judge_assignments (event_id, project_id, judge_user_id, track_id) VALUES ($1, $2, $3, $4) RETURNING *`, [eventId, projectId, judgeId, trackRaw ?? null]);
       const row = ins.rows[0];
@@ -203,7 +227,7 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
     if (eventFilter !== undefined && await denyUnless(req, reply, eventFilter, "participant", "judge", "organizer")) return;
     const vals: unknown[] = [userId];
     if (eventFilter !== undefined) vals.push(eventFilter);
-    const r = await pool.query<AssignmentRow>(`SELECT a.* FROM judge_assignments a JOIN event_memberships m ON m.event_id = a.event_id AND m.user_id = $1 JOIN projects p ON p.id = a.project_id WHERE a.judge_user_id = $1 AND a.status = 'active' AND (m.track_id IS NULL OR COALESCE(a.track_id, p.track_id) = m.track_id)${eventFilter !== undefined ? ` AND a.event_id = $2` : ``} ORDER BY a.id ASC`, vals);
+    const r = await pool.query<AssignmentRow>(`SELECT a.* FROM judge_assignments a JOIN event_memberships m ON m.event_id = a.event_id AND m.user_id = $1 JOIN projects p ON p.id = a.project_id WHERE a.judge_user_id = $1 AND a.status = 'active' AND (m.role IN ('organizer','admin') OR m.track_scope_all OR m.track_id = COALESCE(a.track_id, p.track_id) OR EXISTS (SELECT 1 FROM event_membership_tracks mt WHERE mt.membership_id = m.id AND mt.track_id = COALESCE(a.track_id, p.track_id)))${eventFilter !== undefined ? ` AND a.event_id = $2` : ``} ORDER BY a.id ASC`, vals);
     return reply.send({ assignments: r.rows });
   });
   app.post("/api/scores", async (req, reply) => {
@@ -234,6 +258,8 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      const event = (await client.query<{ state: string }>(`SELECT state FROM events WHERE id = (SELECT event_id FROM judge_assignments WHERE id = $1) FOR UPDATE`, [assignmentId])).rows[0];
+      if (!event || !canWriteJudgeBallot(event.state)) { await safeRollback(client); return reply.code(409).send({ error: "judging_closed" }); }
       await client.query(`SELECT pg_advisory_xact_lock(hashtext('score_' || $1))`, [assignmentId]);
       const la = (await client.query<AssignmentRow>(`SELECT * FROM judge_assignments WHERE id = $1 FOR UPDATE`, [assignmentId])).rows[0];
       if (!la || la.judge_user_id !== userId || la.status !== "active") { await safeRollback(client); return reply.code(404).send({ error: "not_found" }); }
@@ -286,6 +312,8 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      const event = (await client.query<{ state: string }>(`SELECT state FROM events WHERE id = (SELECT event_id FROM judge_assignments WHERE id = $1) FOR UPDATE`, [old.assignment_id])).rows[0];
+      if (!event || !canWriteJudgeBallot(event.state)) { await safeRollback(client); return reply.code(409).send({ error: "judging_closed" }); }
       await client.query(`SELECT pg_advisory_xact_lock(hashtext('score_' || $1))`, [old.assignment_id]);
       const la = (await client.query<AssignmentRow>(`SELECT * FROM judge_assignments WHERE id = $1 FOR UPDATE`, [old.assignment_id])).rows[0];
       const lc = (await client.query<ScoreRow>(`SELECT * FROM scores WHERE id = $1 FOR UPDATE`, [id])).rows[0];

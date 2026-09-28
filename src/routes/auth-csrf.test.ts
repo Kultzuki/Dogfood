@@ -160,6 +160,18 @@ describe("Auth & CSRF error distinction & login routing", () => {
     expect(body.error).toBe("invalid_credentials");
   });
 
+  it("rejects passwords over 128 characters before verification", async () => {
+    const getRes = await app.inject({ method: "GET", url: "/", headers: { "x-test-sid": "s-long" } });
+    const token = getRes.body.match(/name="_csrf"\s+value="([^"]+)"/)?.[1] ?? "";
+    const res = await app.inject({
+      method: "POST", url: "/login",
+      headers: { "content-type": "application/json", "x-csrf-token": token, "x-test-sid": "s-long" },
+      payload: { email: cannedUser.email, password: "x".repeat(129) },
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toEqual({ error: "invalid_input" });
+  });
+
   it("Form POST /login with valid credentials & valid CSRF redirects to /dashboard", async () => {
     const getRes = await app.inject({
       method: "GET",

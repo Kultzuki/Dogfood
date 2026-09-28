@@ -184,8 +184,8 @@ export const registerShellPages = fp(async function registerShellPages(
         view.errors.email = "Enter a valid email address.";
         invalid = true;
       }
-      if (password.length < 8) {
-        view.errors.password = "Password must be at least 8 characters.";
+      if (password.length < 8 || password.length > 128) {
+        view.errors.password = "Password must be between 8 and 128 characters.";
         invalid = true;
       }
       if (invalid) return reply.code(422).view("register.njk", view);

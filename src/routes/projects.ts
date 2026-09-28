@@ -6,6 +6,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { PoolClient } from "pg";
 import { pool } from "../db/index.js";
 import { requireAuth } from "../authz/guards.js";
+import { isHttpUrl } from "../lib/url.js";
 
 interface ProjectRow {
   id: string; event_id: string; team_id: string; track_id: string | null;
@@ -15,6 +16,7 @@ interface ProjectRow {
 interface ProjectBody {
   title?: unknown; tagline?: unknown; description?: unknown;
   techTags?: unknown; tech_tags?: unknown; trackId?: unknown; track_id?: unknown;
+  repo_url?: unknown; demo_url?: unknown;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,13 +50,8 @@ async function requireUser(req: FastifyRequest, reply: FastifyReply): Promise<st
 }
 
 async function isTeamMember(teamId: string, userId: string): Promise<boolean> {
-  for (const table of ["team_members", "team_memberships"]) {
-    try {
-      const r = await pool.query(`SELECT 1 FROM ${table} WHERE team_id = $1 AND user_id = $2 LIMIT 1`, [teamId, userId]);
-      if ((r.rowCount ?? 0) > 0) return true;
-    } catch { /* table may not exist yet — try the next name */ }
-  }
-  return false;
+  const r = await pool.query(`SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 LIMIT 1`, [teamId, userId]);
+  return (r.rowCount ?? r.rows.length) > 0;
 }
 
 function fieldErr(body: ProjectBody, needTitle: boolean): string | undefined {
@@ -67,6 +64,12 @@ function fieldErr(body: ProjectBody, needTitle: boolean): string | undefined {
   if (tags !== undefined && (!Array.isArray(tags) || !tags.every((x: unknown) => typeof x === "string"))) return "invalid_tech_tags";
   const tr = body.trackId ?? body.track_id;
   if (tr !== undefined && tr !== null && (typeof tr !== "string" || !UUID_RE.test(tr))) return "invalid_track";
+  for (const key of ["repo_url", "demo_url"] as const) {
+    const value = body[key];
+    if (value !== undefined && value !== null && value !== "") {
+      if (typeof value !== "string" || !isHttpUrl(value)) return `invalid_${key}`;
+    }
+  }
   return undefined;
 }
 
@@ -119,17 +122,17 @@ export default async function projectRoutes(app: FastifyInstance): Promise<void>
     }
     // DB-clock deadline gate (mirrors edit/submit): NULL bounds = open.
     {
-      const dl = await pool.query("SELECT ((submissions_open_at IS NULL OR now() >= submissions_open_at) AND (submissions_close_at IS NULL OR now() <= submissions_close_at)) AS open FROM events WHERE id = $1", [eventId]);
+      const dl = await pool.query("SELECT state, ((submissions_open_at IS NULL OR now() >= submissions_open_at) AND (submissions_close_at IS NULL OR now() <= submissions_close_at)) AS open FROM events WHERE id = $1", [eventId]);
       if ((dl.rowCount ?? 0) === 0) return reply.code(404).send({ error: "not_found" });
-      if (!(dl.rows[0] as { open: boolean }).open) return reply.code(422).send({ error: "deadline_passed" });
+      if ((dl.rows[0] as { state: string; open: boolean }).state !== "SUBMISSIONS_OPEN" || !(dl.rows[0] as { open: boolean }).open) return reply.code(422).send({ error: "submissions_closed" });
     }
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
       let project: ProjectRow;
       try {
-        const ins = await client.query("INSERT INTO projects (event_id, team_id, track_id, title, tagline, description, tech_tags) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-          [eventId, teamId, f.trackId, (body.title as string).trim(), f.tagline, f.description, f.techTags]);
+        const ins = await client.query("INSERT INTO projects (event_id, team_id, track_id, title, tagline, description, tech_tags, repo_url, demo_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+          [eventId, teamId, f.trackId, (body.title as string).trim(), f.tagline, f.description, f.techTags, body.repo_url || null, body.demo_url || null]);
         project = ins.rows[0] as ProjectRow;
       } catch (e) {
         await safeRollback(client);
@@ -150,17 +153,17 @@ export default async function projectRoutes(app: FastifyInstance): Promise<void>
     const body = (req.body ?? {}) as ProjectBody;
     const err = fieldErr(body, false);
     if (err) return reply.code(422).send({ error: err });
-    if (body.title === undefined && body.tagline === undefined && body.description === undefined && body.techTags === undefined && body.tech_tags === undefined && body.trackId === undefined && body.track_id === undefined) {
+    if (body.title === undefined && body.tagline === undefined && body.description === undefined && body.techTags === undefined && body.tech_tags === undefined && body.trackId === undefined && body.track_id === undefined && body.repo_url === undefined && body.demo_url === undefined) {
       return reply.code(422).send({ error: "invalid_input" });
     }
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const cur = await client.query("SELECT p.*, ((SELECT e.submissions_open_at IS NOT NULL AND now() < e.submissions_open_at FROM events e WHERE e.id = p.event_id) OR (SELECT e.submissions_close_at IS NOT NULL AND now() > e.submissions_close_at FROM events e WHERE e.id = p.event_id)) AS past_due FROM projects p WHERE p.id = $1 AND p.event_id = $2 FOR UPDATE", [projectId, eventId]);
-      const row = cur.rows[0] as (ProjectRow & { past_due: boolean | null }) | undefined;
+      const cur = await client.query("SELECT p.*, e.state AS event_state, ((e.submissions_open_at IS NOT NULL AND now() < e.submissions_open_at) OR (e.submissions_close_at IS NOT NULL AND now() > e.submissions_close_at)) AS past_due FROM projects p JOIN events e ON e.id = p.event_id WHERE p.id = $1 AND p.event_id = $2 FOR UPDATE OF p, e", [projectId, eventId]);
+      const row = cur.rows[0] as (ProjectRow & { event_state: string; past_due: boolean }) | undefined;
       if (!row) { await safeRollback(client); return reply.code(404).send({ error: "not_found" }); }
       if (!(await isTeamMember(row.team_id, userId))) { await safeRollback(client); return reply.code(404).send({ error: "not_found" }); }
-      if (row.past_due) { await safeRollback(client); return reply.code(422).send({ error: "deadline_passed" }); }
+      if (row.event_state !== "SUBMISSIONS_OPEN" || row.past_due) { await safeRollback(client); return reply.code(422).send({ error: "submissions_closed" }); }
       const sets: string[] = [];
       const vals: unknown[] = [];
       if (body.title !== undefined) { sets.push(`title = $${vals.length + 1}`); vals.push((body.title as string).trim()); }
@@ -170,6 +173,7 @@ export default async function projectRoutes(app: FastifyInstance): Promise<void>
       if (tags !== undefined) { sets.push(`tech_tags = $${vals.length + 1}`); vals.push(tags); }
       const tr = body.trackId ?? body.track_id;
       if (tr !== undefined) { sets.push(`track_id = $${vals.length + 1}`); vals.push(typeof tr === "string" ? tr : null); }
+      for (const key of ["repo_url", "demo_url"] as const) if (body[key] !== undefined) { sets.push(`${key} = $${vals.length + 1}`); vals.push(body[key] || null); }
       sets.push("updated_at = now()");
       vals.push(projectId);
       let updated: ProjectRow;
@@ -196,7 +200,7 @@ export default async function projectRoutes(app: FastifyInstance): Promise<void>
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const up = await client.query("UPDATE projects SET status = 'submitted', updated_at = now() WHERE id = $1 AND status = 'draft' AND (SELECT ((e.submissions_open_at IS NULL OR now() >= e.submissions_open_at) AND (e.submissions_close_at IS NULL OR now() <= e.submissions_close_at)) FROM events e WHERE e.id = $2) RETURNING *", [projectId, eventId]);
+      const up = await client.query("UPDATE projects SET status = 'submitted', updated_at = now() WHERE id = $1 AND status = 'draft' AND (SELECT e.state = 'SUBMISSIONS_OPEN' AND (e.submissions_open_at IS NULL OR now() >= e.submissions_open_at) AND (e.submissions_close_at IS NULL OR now() <= e.submissions_close_at) FROM events e WHERE e.id = $2) RETURNING *", [projectId, eventId]);
       const done = up.rows[0] as ProjectRow | undefined;
       if (!done) {
         const again = await client.query("SELECT status, ((SELECT e.submissions_open_at IS NOT NULL AND now() < e.submissions_open_at FROM events e WHERE e.id = $2) OR (SELECT e.submissions_close_at IS NOT NULL AND now() > e.submissions_close_at FROM events e WHERE e.id = $2)) AS past_due FROM projects WHERE id = $1", [projectId, eventId]);

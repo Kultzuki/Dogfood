@@ -33,12 +33,16 @@ const canned = vi.hoisted(() => ({
   clientQueries: [] as string[],
   scoreInserts: [] as unknown[][],
   assignmentInserts: [] as unknown[][],
+  judgeScopeAllowed: true,
 }));
 
 vi.mock("../db/index.js", () => {
   const matchPool = async (text: string, values?: unknown[]) => {
     const v = (values ?? []) as unknown[];
     canned.poolQueries.push(text);
+    if (text.includes("SELECT 1 FROM event_memberships m")) {
+      return { rows: canned.judgeScopeAllowed ? [{ "?column?": 1 }] : [], rowCount: canned.judgeScopeAllowed ? 1 : 0 };
+    }
     if (text.includes("FROM event_memberships") && text.includes("user_id")) {
       const rows = canned.membershipByEvent[String(v[1] ?? "")] ?? [];
       return { rows, rowCount: rows.length };
@@ -47,9 +51,12 @@ vi.mock("../db/index.js", () => {
       const rows = canned.eventExists ? [{ "?column?": 1 }] : [];
       return { rows, rowCount: rows.length };
     }
+    if (text.includes("FROM tracks")) {
+      return { rows: [{ id: String((v[1] as string[])[0]) }], rowCount: 1 };
+    }
     if (text.includes("FROM projects") && text.includes("event_id")) {
       const wanted = new Set((v[1] as string[]) ?? []);
-      const rows = canned.projects.filter((id) => wanted.has(id)).map((id) => ({ id }));
+      const rows = canned.projects.filter((id) => wanted.has(id)).map((id) => ({ id, track_id: "track-a" }));
       return { rows, rowCount: rows.length };
     }
     if (text.includes("FROM users")) {
@@ -113,6 +120,7 @@ const PROJECT_P = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const JUDGE_J = "66666666-6666-4666-8666-666666666666";
 const ORGANIZER_1 = "99999999-9999-4999-8999-999999999999";
 const ASSIGNMENT_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const TRACK_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
 const scoreRow = (): Record<string, string> => ({
   event_id: EVENT_A,
@@ -135,6 +143,7 @@ beforeEach(() => {
   canned.clientQueries = [];
   canned.scoreInserts = [];
   canned.assignmentInserts = [];
+  canned.judgeScopeAllowed = true;
 });
 
 describe("validateScoreRow", () => {
@@ -211,6 +220,19 @@ describe("runImport scores", () => {
     const out = await runImport(pool, EVENT_A, "scores", [scoreRow()]);
     expect(out).toEqual({ imported: 0, errors: [{ row: 1, errors: ["unknown_project"] }] });
     expect(canned.scoreInserts).toHaveLength(0);
+  });
+
+  it("rejects assignments/imported scores outside the judge track scope", async () => {
+    canned.judgeScopeAllowed = false;
+    const result = await runImport(pool, EVENT_A, "assignments", [{
+      event_id: EVENT_A,
+      project_id: PROJECT_P,
+      judge_user_id: JUDGE_J,
+      track_id: TRACK_ID,
+      status: "active",
+    }]);
+    expect(result).toEqual({ imported: 0, errors: [{ row: 1, errors: ["judge_track_forbidden"] }] });
+    expect(canned.assignmentInserts).toHaveLength(0);
   });
 });
 

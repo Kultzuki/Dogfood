@@ -91,17 +91,17 @@ export async function registerParticipantPages(
     const { projectId } = req.params as { projectId: string };
     if (!UUID_RE.test(projectId)) return reply.code(422).send({ error: "invalid_input" });
     interface DetailRow {
-      id: string; title: string; tagline: string | null; description: string;
+      id: string; title: string; tagline: string | null; description: string; repo_url: string | null; demo_url: string | null;
       tech_tags: string[] | null; status: string; event_name: string;
       track_name: string | null; team_name: string | null;
     }
     const r = await pool.query<DetailRow>(
-      `SELECT p.id, p.title, p.tagline, p.description, p.tech_tags, p.status,
+      `SELECT p.id, p.title, p.tagline, p.description, p.repo_url, p.demo_url, p.tech_tags, p.status,
               e.name AS event_name, t.name AS track_name, tm.name AS team_name
          FROM projects p JOIN events e ON e.id = p.event_id
          LEFT JOIN tracks t ON t.id = p.track_id
          LEFT JOIN teams tm ON tm.id = p.team_id
-        WHERE p.id = $1 AND p.status = 'submitted' AND e.state IN ($2, $3, $4, $5)`,
+        WHERE p.id = $1 AND p.status = 'submitted' AND p.needs_review = false AND e.state IN ($2, $3, $4, $5)`,
       [projectId, ...SHOWCASE_STATES],
     );
     const row = r.rows[0];
@@ -166,6 +166,8 @@ export async function registerParticipantPages(
         title: row.title,
         tagline: row.tagline ?? "",
         description: row.description,
+        repoUrl: row.repo_url,
+        demoUrl: row.demo_url,
         techTags: row.tech_tags ?? [],
       },
       trackName: row.track_name ?? "",

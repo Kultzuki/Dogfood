@@ -37,6 +37,7 @@ export interface FixtureProject {
   title: string;
   summary: string;
   repoUrl: string;
+  demoUrl: string;
   submittedAt: string;
 }
 
@@ -62,6 +63,24 @@ export interface Fixture {
   scores: FixtureScore[];
 }
 
+/** Deterministic fixture duplicate pairs; first fixture entry remains canonical. */
+export function duplicateFixturePairs(projects: FixtureProject[]): Array<{ keepId: string; duplicateId: string }> {
+  const canonical = new Map<string, string>();
+  const pairs: Array<{ keepId: string; duplicateId: string }> = [];
+  for (const project of projects) {
+    const repo = project.repoUrl.trim().toLowerCase().replace(/\/$/, "");
+    const title = project.title.trim().toLowerCase().replace(/\s+/g, " ");
+    const keys = [
+      ...(repo ? [`${project.team}\u0000repo:${repo}`] : []),
+      ...(title ? [`${project.team}\u0000title:${title}`] : []),
+    ];
+    const first = keys.map((key) => canonical.get(key)).find((id): id is string => id !== undefined);
+    if (first) pairs.push({ keepId: first, duplicateId: project.id });
+    else for (const key of keys) canonical.set(key, project.id);
+  }
+  return pairs;
+}
+
 interface RawFixture {
   event?: { id?: unknown; name?: unknown; submissions_close?: unknown };
   tracks?: Array<{ id?: unknown; name?: unknown }>;
@@ -74,6 +93,7 @@ interface RawFixture {
     title?: unknown;
     summary?: unknown;
     repo_url?: unknown;
+    demo_url?: unknown;
     submitted_at?: unknown;
   }>;
   scores?: Array<{ judge?: unknown; project?: unknown; criteria?: unknown; comment?: unknown }>;
@@ -121,6 +141,7 @@ export function parseFixture(json: unknown): Fixture {
       title: asString(p.title),
       summary: asString(p.summary),
       repoUrl: asString(p.repo_url),
+      demoUrl: asString(p.demo_url),
       submittedAt: asString(p.submitted_at),
     })),
     scores: (raw.scores ?? []).map((s) => ({

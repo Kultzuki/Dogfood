@@ -18,6 +18,11 @@ export const EVENT_STATES = [
 
 export type EventState = (typeof EVENT_STATES)[number];
 
+/** Ballot writes are accepted only while judging is active. */
+export function canWriteJudgeBallot(state: string): boolean {
+  return state === "JUDGING";
+}
+
 // ── Transition table ──────────────────────────────────────────────────
 
 /** Allowed outgoing transitions for each state. */

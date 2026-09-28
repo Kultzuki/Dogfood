@@ -1,0 +1,61 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://dogfood:dogfood@db:5432/dogfood
+      # ── SESSION_SECRET ────────────────────────────────────────────────
+      # No deterministic default is shipped. Leave SESSION_SECRET unset for
+      # a secure first-boot auto-generated secret (persisted to the appdata
+      # volume, 0600, reused on restart — see docker/entrypoint.sh).
+      # For a real deployment, always supply your own:
+      #   SESSION_SECRET=$(openssl rand -hex 32) docker compose up -d
+      #
+      # Acceptance harness note: the committed .dogfood.toml cookies are
+      # HMAC-signed with whatever secret the app booted with. After
+      # `docker compose up`, copy the printed `Cookie: sid=...` lines
+      # (organizer / judge_a / judge_b / participant) into .dogfood.toml,
+      # then run `py -3 stuff/run.py .dogfood.toml`.
+      # A deterministic local-sandbox secret is available ONLY as an
+      # explicit opt-in for checker reproducibility:
+      #   SESSION_SECRET=dogfood-local-demo-session-secret-0000000000 docker compose up -d
+      # Never use that value outside a throwaway local sandbox.
+      SESSION_SECRET: "${SESSION_SECRET:-}"
+      NODE_ENV: production
+      # ── DEMO ACCOUNTS (opt-in only) ──────────────────────────────────
+      # Seeds four fixed password accounts (test.organizer / test.judgea /
+      # test.judgeb / test.participant @dogfood.local, shared password) so a
+      # human can drive the browser UI locally or record the demo video.
+      # They are NOT the acceptance fixture identities and .dogfood.toml
+      # never references them. DEFAULT IS 0 (disabled). Enable explicitly:
+      #   DOGFOOD_DEMO_ACCOUNTS=1 docker compose up -d
+      DOGFOOD_DEMO_ACCOUNTS: "${DOGFOOD_DEMO_ACCOUNTS:-0}"
+    volumes:
+      - appdata:/app/data
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dogfood -d dogfood"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    environment:
+      POSTGRES_USER: dogfood
+      POSTGRES_PASSWORD: dogfood
+      POSTGRES_DB: dogfood
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  appdata:

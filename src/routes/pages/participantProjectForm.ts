@@ -7,6 +7,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import "@fastify/view";
 import { pool } from "../../db/index.js";
 import { validateAnswerValue, type QuestionRow } from "../../db/gallery.js";
+import { isHttpUrl } from "../../lib/url.js";
 import {
   UUID_RE,
   deadlineBanner,
@@ -38,6 +39,8 @@ export interface FormValues {
   description: string;
   trackId: string;
   techTagsRaw: string;
+  repoUrl: string;
+  demoUrl: string;
 }
 
 export async function loadProject(
@@ -127,6 +130,8 @@ export function readFields(body: Record<string, unknown>): {
     description: typeof body.description === "string" ? body.description : "",
     trackId: typeof body.track_id === "string" ? body.track_id : "",
     techTagsRaw: typeof body.tech_tags === "string" ? body.tech_tags : "",
+    repoUrl: typeof body.repo_url === "string" ? body.repo_url : "",
+    demoUrl: typeof body.demo_url === "string" ? body.demo_url : "",
   };
   if (!values.title || values.title.length > 255) {
     return { values, techTags: [], error: "Enter a title of 1–255 characters." };
@@ -136,6 +141,10 @@ export function readFields(body: Record<string, unknown>): {
   }
   if (values.trackId && !UUID_RE.test(values.trackId)) {
     return { values, techTags: [], error: "Select a valid track." };
+  }
+  for (const [label, value] of [["Repository", values.repoUrl], ["Demo", values.demoUrl]] as const) {
+    if (!value) continue;
+    if (!isHttpUrl(value)) return { values, techTags: [], error: `${label} URL must be a valid http or https URL of at most 2048 characters.` };
   }
   return { values, techTags: parseTechTags(body.tech_tags), error: null };
 }
@@ -180,12 +189,16 @@ export async function renderProjectForm(
     description: typeof body.description === "string" ? body.description : "",
     trackId: typeof body.track_id === "string" ? body.track_id : "",
     techTagsRaw: typeof body.tech_tags === "string" ? body.tech_tags : "",
+    repoUrl: typeof body.repo_url === "string" ? body.repo_url : "",
+    demoUrl: typeof body.demo_url === "string" ? body.demo_url : "",
   } : {
     title: project?.title ?? "",
     tagline: project?.tagline ?? "",
     description: project?.description ?? "",
     trackId: project?.track_id ?? "",
     techTagsRaw: (project?.tech_tags ?? []).join(", "),
+    repoUrl: project?.repo_url ?? "",
+    demoUrl: project?.demo_url ?? "",
   };
   return reply.code(opts.status).view("project_form.njk", {
     mode,

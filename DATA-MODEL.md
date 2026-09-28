@@ -15,12 +15,13 @@ journaled in `schema_migrations`).
 | `users` | `0001_init.sql` | Accounts. `email` unique. `role`: `admin` / `organizer` / `judge` / `participant` (system default; event-scoped authority lives in `event_memberships`). |
 | `sessions` | `0001` + `0002_auth.sql` | Login sessions. `token` unique, looked up from the signed `sid` cookie. `last_seen_at` (24 h idle), `absolute_expires_at` (30 d), `revoked_at` (logout/revoke). |
 | `events` | `0003_events.sql` (+ `submissions_close_at` from `0007`, `voting_opens_at` / `voting_closes_at` from `0014`, `starts_at` / `ends_at` / `submissions_open_at` from `0016`) | Hackathon events. `state` lifecycle machine. Submissions open iff `(submissions_open_at IS NULL OR now() >= open) AND (submissions_close_at IS NULL OR now() <= close)` on the DB clock; both NULL = open indefinitely. Community voting is active iff `voting_opens_at IS NOT NULL AND voting_opens_at <= now() AND (voting_closes_at IS NULL OR voting_closes_at > now())`; both NULL (the default) means voting never opens. `starts_at <= ends_at` and `open < close` enforced by API validation (422). |
-| `event_memberships` | `0003` (+ `track_id` scope from `0005`) | Per-event roles: `participant` / `judge` / `organizer`. `UNIQUE(event_id, user_id)`. `track_id NULL` = unscoped. |
+| `event_memberships` | `0003` (+ `track_id` from `0005`, explicit scopes from `0020`) | Per-event roles: `participant` / `judge` / `organizer`. `UNIQUE(event_id, user_id)`. A judge's `track_id NULL` is not a wildcard. |
+| `event_membership_tracks` | `0020_membership_track_scopes.sql` | Explicit many-to-many allowed tracks for a membership; rows cascade when a membership or track is deleted. |
 | `tracks` | `0004_tracks.sql` | Event tracks. `UNIQUE(event_id, slug)`. |
 | `prizes` | `0004_tracks.sql` | Event prizes, optionally per track. |
 | `teams` | `0006_teams.sql` (+ `leader_user_id` / `created_by` from `0017`) | `invite_token` unique (invite-link joins), `max_size` 1–20. Creator becomes `leader_user_id`/`created_by`; non-organizer creators auto-join `team_members`. Leave policy: submitted project blocks (409), sole member dissolves the team, leader passes to oldest remaining member. |
 | `team_members` | `0006_teams.sql` | `UNIQUE(team_id, user_id)` and `UNIQUE(user_id, event_id)` (one team per user per event). |
-| `projects` | `0007_projects.sql` | Submissions. `status` ∈ `draft`/`submitted` (DB check). `tech_tags TEXT[]`. |
+| `projects` | `0007_projects.sql` + `0021_duplicate_projects.sql` + `0022_project_links.sql` | Submissions. `status` ∈ `draft`/`submitted` (DB check), `tech_tags TEXT[]`, nullable HTTP(S)-only `repo_url`/`demo_url`, `duplicate_of_project_id` self-reference, and `needs_review`. |
 | `project_versions` | `0007_projects.sql` | Append-only snapshots (DB trigger blocks UPDATE/DELETE). |
 | `uploads` | `0008_uploads.sql` | Upload metadata; bytes on local disk. |
 | `custom_questions` / `custom_answers` | `0009_gallery.sql` | Organizer-defined submission fields + answers. |
@@ -54,12 +55,19 @@ Boot converges the `Sample Hack 2026` event to the fixture content:
   members + probe participant → `participant`, all unscoped (`track_id NULL`).
 - **Teams**: fixture `id` → `teams.invite_token = 'fixture-<id>'` (stable,
   unique); all fixture members added to `team_members`.
-- **Projects**: `title` verbatim, `summary` → `description`, `status` =
-  `submitted`, `created_at`/`updated_at` = fixture `submitted_at`. (The
-  schema has no `submitted_at`/`repo_url` columns; those fixture fields are
-  not stored.)
+- **Projects**: `title` verbatim, `summary` → `description`, fixture `repo_url`
+  stored in `projects.repo_url`, optional `demo_url` stored when present,
+  `status` = `submitted`, and `created_at`/`updated_at` = fixture
+  `submitted_at`.
+- **Duplicates**: same-team projects with the same normalized repository URL
+  (or normalized title if no repository URL exists) are retained. The first
+  fixture row is canonical; later rows set `duplicate_of_project_id` to the
+  canonical row and `needs_review=true`. Such rows are excluded from public
+  gallery/detail, assignment creation/import, and ranking input/output until
+  an organizer submits a resolution action. The seeded duplicate pair is
+  `prj_07` / `prj_41`.
 - **Assignments/scores**: one `judge_assignments` row per (`judge`,
-  `project`) pair; one current `scores` row per fixture score entry with
+  `project`) pair except unresolved duplicate projects; one current `scores` row per fixture score entry with
   scalar `value = round(mean(criteria) * 20)` (fixture criteria are 1–5
   marks; the app stores a single 0–100 value). Fixture score `comment`
   text is not stored by the convergent seeder.

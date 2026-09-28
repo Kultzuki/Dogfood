@@ -27,6 +27,8 @@ const canned = vi.hoisted(() => ({
   eventExists: true,
   trackValid: true,
   existingMembership: undefined as { role: string } | undefined,
+  scopedTracks: {} as Record<string, string[]>,
+  scopeAll: {} as Record<string, boolean>,
   membershipRow: undefined as Record<string, unknown> | undefined,
   projectRow: undefined as Record<string, unknown> | undefined,
   assignmentRow: undefined as Record<string, unknown> | undefined,
@@ -42,6 +44,9 @@ vi.mock("../db/index.js", () => ({
       if (text.includes("INSERT INTO event_memberships")) {
         canned.inserts.push("membership");
         if (text.includes("ON CONFLICT (event_id, user_id) DO NOTHING")) {
+          const userId = String(v[1] ?? "");
+          const trackId = String(v[2] ?? "");
+          canned.scopedTracks[userId] = [...(canned.scopedTracks[userId] ?? []), trackId];
           return { rows: [], rowCount: 0 };
         }
         if (canned.duplicateMembershipNext) {
@@ -56,6 +61,12 @@ vi.mock("../db/index.js", () => ({
           track_id: (v[2] as string | null) ?? null,
         };
         return { rows: [row], rowCount: 1 };
+      }
+      if (text.includes("SELECT 1 FROM event_memberships m")) {
+        const userId = String(v[1] ?? "");
+        const trackId = String(v[2] ?? "");
+        const ok = canned.scopeAll[userId] || (canned.scopedTracks[userId] ?? []).includes(trackId);
+        return { rows: ok ? [{ "?column?": 1 }] : [], rowCount: ok ? 1 : 0 };
       }
       if (text.includes("INSERT INTO judge_assignments")) {
         canned.inserts.push("assignment");
@@ -98,7 +109,7 @@ vi.mock("../db/index.js", () => ({
         return { rows: canned.trackValid ? [{ "?column?": 1 }] : [], rowCount: canned.trackValid ? 1 : 0 };
       }
       if (text.includes("FROM projects WHERE id")) {
-        const rows = canned.projectRow ? [canned.projectRow] : [];
+        const rows = canned.projectRow ? [canned.projectRow] : [{ event_id: EVENT_A, track_id: null }];
         return { rows, rowCount: rows.length };
       }
       if (text.includes("FROM audit_logs") || text.includes("INSERT INTO audit_logs")) {
@@ -118,6 +129,7 @@ vi.mock("../db/index.js", () => ({
 const EVENT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const EVENT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const TRACK_A = "11111111-1111-4111-8111-111111111111";
+const TRACK_B = "22222222-2222-4222-8222-222222222222";
 const PROJECT_ID = "55555555-5555-4555-8555-555555555555";
 const JUDGE_1 = "66666666-6666-4666-8666-666666666666";
 const ORGANIZER_1 = "99999999-9999-4999-8999-999999999999";
@@ -165,8 +177,10 @@ beforeEach(() => {
   canned.eventExists = true;
   canned.trackValid = true;
   canned.existingMembership = undefined;
+  canned.scopedTracks = {};
+  canned.scopeAll = {};
   canned.membershipRow = undefined;
-  canned.projectRow = { event_id: EVENT_A };
+  canned.projectRow = { event_id: EVENT_A, track_id: TRACK_A };
   canned.assignmentRow = undefined;
   canned.duplicateMembershipNext = false;
   canned.duplicateAssignmentNext = false;
@@ -315,6 +329,28 @@ describe("POST /api/assignments membership bridge", () => {
     expect(res.statusCode).toBe(201);
     expectNoLeak(res);
     expect(canned.inserts).toEqual(["membership", "assignment"]);
+  });
+
+  it("refuses an assignment outside an existing judge track scope", async () => {
+    organizerIn();
+    canned.usersById[JUDGE_1] = { id: JUDGE_1, role: "judge" };
+    canned.projectRow = { event_id: EVENT_A, track_id: TRACK_B };
+    canned.existingMembership = { role: "judge" };
+    canned.scopedTracks[JUDGE_1] = [TRACK_A];
+    const res = await post("/api/assignments", assignmentBody, ORGANIZER_1);
+    expect(res.statusCode).toBe(422);
+    expect((res.json() as { error?: string }).error).toBe("judge_track_forbidden");
+    expect(canned.inserts).toEqual([]);
+  });
+
+  it("allows a judge scoped to several tracks", async () => {
+    organizerIn();
+    canned.usersById[JUDGE_1] = { id: JUDGE_1, role: "judge" };
+    canned.projectRow = { event_id: EVENT_A, track_id: TRACK_B };
+    canned.existingMembership = { role: "judge" };
+    canned.scopedTracks[JUDGE_1] = [TRACK_A, TRACK_B];
+    const res = await post("/api/assignments", assignmentBody, ORGANIZER_1);
+    expect(res.statusCode).toBe(201);
   });
 
   it("rejects participant judges (422 not_a_judge) without inserting", async () => {

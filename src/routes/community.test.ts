@@ -197,7 +197,6 @@ beforeAll(async () => {
   // No template engine in tests: stub reply.view as JSON so page routes
   // can be exercised for status codes, redirects, and rendered data.
   void app.decorateReply("view", function (template: string, data: unknown) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (this as any).code(200).send({ template, data });
   });
   await app.register(communityRoutes);

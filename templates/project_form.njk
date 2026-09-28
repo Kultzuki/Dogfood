@@ -104,6 +104,14 @@
         </div>
 
         <div class="form__group">
+          <label class="form__label" for="repo-url">Repository URL</label>
+          <input class="form__input" type="url" id="repo-url" name="repo_url" value="{{ values.repoUrl | escape }}" maxlength="2048" placeholder="https://github.com/team/project">
+        </div>
+        <div class="form__group">
+          <label class="form__label" for="demo-url">Demo URL</label>
+          <input class="form__input" type="url" id="demo-url" name="demo_url" value="{{ values.demoUrl | escape }}" maxlength="2048" placeholder="https://example.com">
+        </div>
+        <div class="form__group">
           <label class="form__label" for="tech-tags">Tech tags (comma separated)</label>
           <input class="form__input" type="text" id="tech-tags" name="tech_tags" value="{{ techTagsRaw }}" placeholder="node, postgres, css">
           <p class="p-help">Lowercase, comma separated — powers gallery search.</p>

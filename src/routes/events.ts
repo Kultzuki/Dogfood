@@ -180,12 +180,14 @@ async function eventRoutes(app: FastifyInstance): Promise<void> {
   app.get("/events/:id", async (req: FastifyRequest, reply: FastifyReply) => {
     const { id } = req.params as { id: string };
     if (!id || !UUID_RE.test(id)) return reply.code(422).send({ error: "invalid_input" });
+    const publicEvent = await pool.query(`SELECT id, name, description, state, starts_at, ends_at, submissions_open_at, submissions_close_at FROM events WHERE id = $1 AND state = 'PUBLISHED'`, [id]);
+    if (publicEvent.rows[0]) return reply.send({ event: publicEvent.rows[0] });
     const userId = await requireUser(req, reply);
     if (userId === undefined) return;
     const res = await pool.query(`SELECT * FROM events WHERE id = $1`, [id]);
     const event = res.rows[0] as EventRow | undefined;
     if (!event) return reply.code(404).send({ error: "not_found" });
-    if (event.state !== "PUBLISHED" && !await isMember(id, userId)) {
+    if (!await isMember(id, userId)) {
       return reply.code(404).send({ error: "not_found" });
     }
     return reply.send({ event });

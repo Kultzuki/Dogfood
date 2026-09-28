@@ -60,8 +60,10 @@ async function eventExists(id: string): Promise<boolean> {
 type AnyRow = Record<string, unknown>;
 const str = (r: AnyRow, k: string): string => cellText(r[k]);
 
-async function tableRows(table: string, eventId: string, order: string): Promise<AnyRow[]> {
-  const r = await pool.query(`SELECT * FROM ${table} WHERE event_id = $1 ORDER BY ${order}`, [eventId]);
+async function tableRows(dataset: ExportDataset, eventId: string): Promise<AnyRow[]> {
+  const source = EXPORT_SOURCE[dataset];
+  if (!source) throw new Error("unsupported export dataset");
+  const r = await pool.query(`SELECT * FROM ${source.table} WHERE event_id = $1 ORDER BY ${source.order}`, [eventId]);
   return r.rows as AnyRow[];
 }
 
@@ -221,18 +223,50 @@ export async function runImport(
         userIds(jids),
       ]);
       let tracks = new Set<string>();
+      const projectTrackRows = await pool.query(
+        `SELECT id, track_id, needs_review FROM projects WHERE event_id = $1 AND id = ANY($2)`, [eventId, pids],
+      );
+      const projectTracks = new Map(projectTrackRows.rows.map((x) => {
+        const row = x as { id: string; track_id: string | null; needs_review?: boolean };
+        return [String(row.id), { trackId: row.track_id === null ? null : String(row.track_id), needsReview: Boolean(row.needs_review) }] as const;
+      }));
       if (dataset === "assignments") {
         const tids = [...new Set(rows.map((r) => String(r["track_id"] ?? "")).filter((t) => t !== ""))];
         tracks = await scopedIds("tracks", eventId, tids);
       }
-      rows.forEach((r, i) => {
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]!;
         const errs: string[] = [];
         if (!projects.has(String(r["project_id"]))) errs.push("unknown_project");
         if (!users.has(String(r["judge_user_id"]))) errs.push("unknown_judge");
         const t = String(r["track_id"] ?? "");
         if (dataset === "assignments" && t !== "" && !tracks.has(t)) errs.push("unknown_track");
+        const projectTrackInfo = projectTracks.get(String(r["project_id"]));
+        if (!projects.has(String(r["project_id"]))) {
+          if (errs.length > 0) errors.push({ row: i + 1, errors: errs });
+          continue;
+        }
+        if (projectTrackInfo?.needsReview) errs.push("project_needs_review");
+        const projectTrack = projectTrackInfo?.trackId;
+        const requiredTracks = dataset === "assignments" && t !== "" ? [projectTrack, t] : [projectTrack];
+        for (const requiredTrack of requiredTracks) {
+          if (requiredTrack === null || requiredTrack === undefined) {
+            errs.push("judge_track_forbidden");
+            break;
+          }
+          const scope = await pool.query(
+            `SELECT 1 FROM event_memberships m WHERE m.event_id = $1 AND m.user_id = $2
+              AND (m.role IN ('organizer','admin') OR (m.role = 'judge' AND (m.track_scope_all OR m.track_id = $3
+                OR EXISTS (SELECT 1 FROM event_membership_tracks mt WHERE mt.membership_id = m.id AND mt.track_id = $3)))) LIMIT 1`,
+            [eventId, r["judge_user_id"], requiredTrack],
+          );
+          if ((scope.rowCount ?? scope.rows.length) === 0) {
+            errs.push("judge_track_forbidden");
+            break;
+          }
+        }
         if (errs.length > 0) errors.push({ row: i + 1, errors: errs });
-      });
+      }
     } catch (err: unknown) {
       if (isMissingTable(err)) return { error: "not_found" };
       throw err;
@@ -369,8 +403,7 @@ export default async function exportRoutes(app: FastifyInstance): Promise<void> 
     if (!(await eventExists(eventId))) return reply.code(404).send({ error: "not_found" });
     const ds = dataset as ExportDataset;
     try {
-      const src = EXPORT_SOURCE[ds];
-      const records = exportRecords(ds, await tableRows(src.table, eventId, src.order));
+      const records = exportRecords(ds, await tableRows(ds, eventId));
       return reply
         .header("content-type", "text/csv")
         .header("content-disposition", `attachment; filename="${eventId}-${ds}.csv"`)

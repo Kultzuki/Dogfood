@@ -227,7 +227,6 @@ beforeAll(async () => {
 
   // Decorate view to capture render output
   void app.decorateReply("view", function (template: string, data: unknown) {
-    /* eslint-disable-next-line */
     const reply = this as any;
     if (!reply.statusCode) reply.code(200);
     return reply.send({ template, data });

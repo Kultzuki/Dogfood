@@ -75,6 +75,7 @@ export interface GalleryFilters {
   trackId?: string;
   tag?: string;
   limit?: number;
+  offset?: number;
 }
 
 export interface GalleryProject {
@@ -115,6 +116,7 @@ export async function searchGallery(
   let idx = GALLERY_STATES.length + 1;
   const conds = [
     `p.status = 'submitted'`,
+    `p.needs_review = false`,
     `e.state IN ($1, $2, $3, $4)`,
   ];
   if (filters.trackId !== undefined && filters.trackId !== "") {
@@ -137,14 +139,15 @@ export async function searchGallery(
   }
   const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
   params.push(limit);
+  params.push(Math.max(0, Math.floor(filters.offset ?? 0)));
   const res = await pool.query(
     `SELECT p.id, p.event_id, p.team_id, p.track_id, p.title, p.tagline,
             p.description, p.tech_tags, p.status,
             e.name AS event_name, e.state AS event_state, ${rankSel}
        FROM projects p JOIN events e ON e.id = p.event_id
       WHERE ${conds.join(" AND ")}
-      ORDER BY rank DESC, p.created_at DESC
-      LIMIT $${idx}`,
+      ORDER BY rank DESC, p.created_at DESC, p.id ASC
+      LIMIT $${idx} OFFSET $${idx + 1}`,
     params,
   );
   return res.rows as GalleryProject[];

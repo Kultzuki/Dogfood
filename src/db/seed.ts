@@ -4,7 +4,7 @@ import { Pool } from "pg";
 /**
  * Idempotent seed: checks if the `users` table has any rows.
  * - If rows > 0 → skips ("seed skipped (idempotent)")
- * - If rows = 0 → inserts one admin user with a scrypt-hashed placeholder password
+ * - If rows = 0 → inserts one admin with ADMIN_BOOTSTRAP_PASSWORD or a random one-time password
  */
 async function seed(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
@@ -27,9 +27,13 @@ async function seed(): Promise<void> {
       return;
     }
 
-    // Generate a scrypt hash for the default admin password
+    const configuredPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+    if (configuredPassword !== undefined && (configuredPassword.length < 12 || configuredPassword.length > 128)) {
+      throw new Error("ADMIN_BOOTSTRAP_PASSWORD must be 12–128 characters.");
+    }
+    const adminPassword = configuredPassword ?? randomBytes(32).toString("base64url");
     const salt = randomBytes(16).toString("hex");
-    const hash = scryptSync("admin-placeholder-change-me", salt, 64).toString("hex");
+    const hash = scryptSync(adminPassword, salt, 64).toString("hex");
     const passwordHash = `${salt}:${hash}`;
 
     // Insert admin user
@@ -39,7 +43,8 @@ async function seed(): Promise<void> {
       ["admin@dogfood.local", "Admin", passwordHash, "admin"]
     );
 
-    console.log("🌱 Seeded admin user: admin@dogfood.local (change password in production)");
+    console.log("🌱 Seeded admin user: admin@dogfood.local");
+    if (!configuredPassword) console.log(`One-time bootstrap password: ${adminPassword}`);
   } finally {
     await pool.end();
   }

@@ -58,6 +58,8 @@ export interface ProjectInfo {
   tagline: string | null;
   description: string;
   tech_tags: string[];
+  repo_url?: string | null;
+  demo_url?: string | null;
   status: string;
 }
 
@@ -154,18 +156,11 @@ export async function isTeamMember(
   teamId: string,
   userId: string,
 ): Promise<boolean> {
-  for (const table of ["team_members", "team_memberships"]) {
-    try {
-      const r = await pool.query(
-        `SELECT 1 FROM ${table} WHERE team_id = $1 AND user_id = $2 LIMIT 1`,
-        [teamId, userId],
-      );
-      if ((r.rowCount ?? 0) > 0) return true;
-    } catch {
-      // Table may not exist yet — try the next name.
-    }
-  }
-  return false;
+  const r = await pool.query(
+    `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 LIMIT 1`,
+    [teamId, userId],
+  );
+  return (r.rowCount ?? r.rows.length) > 0;
 }
 
 export async function getTracks(eventId: string): Promise<TrackInfo[]> {

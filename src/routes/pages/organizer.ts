@@ -11,6 +11,7 @@ import { EXPORT_DATASETS, type ImportDataset } from "../../lib/csv.js";
 import { dateRangeError, parseIsoNullable } from "../events.js";
 import { fetchActiveRubric, validateWeights, nextRubricVersion } from "../rubrics.js";
 import { parseMaxSize } from "../teams.js";
+import { centerAndRank, type CenterEntry } from "../../lib/csv.js";
 
 type P = { eventId: string };
 interface EventRow {
@@ -50,33 +51,7 @@ function hashCenterEntries(entries: CenterEntryLike[]): string {
 }
 
 function centerRows(entries: CenterEntryLike[]): { projectId: string; normalized: number; rawMean: number; n: number; rank: number }[] {
-  const usable = entries.filter((e) => Number.isFinite(e.value));
-  const g = usable.reduce((a, e) => a + e.value, 0) / (usable.length || 1);
-  const r6 = (x: number): number => { const r = Math.round(x * 1e6) / 1e6; return r === 0 ? 0 : r; };
-  const byJudge = new Map<string, number[]>();
-  for (const e of usable) {
-    const b = byJudge.get(e.judgeId);
-    if (b === undefined) byJudge.set(e.judgeId, [e.value]);
-    else b.push(e.value);
-  }
-  const jm = new Map<string, number>();
-  for (const [j, vs] of byJudge) jm.set(j, vs.reduce((a, x) => a + x, 0) / vs.length);
-  const byProject = new Map<string, { norm: number[]; raw: number[] }>();
-  for (const e of usable) {
-    const m = jm.get(e.judgeId) ?? g;
-    const bucket = byProject.get(e.projectId) ?? { norm: [], raw: [] };
-    bucket.norm.push(e.value - m + g);
-    bucket.raw.push(e.value);
-    byProject.set(e.projectId, bucket);
-  }
-  const rows = [...byProject].map(([projectId, v]) => ({
-    projectId,
-    normalized: r6(v.norm.reduce((a, x) => a + x, 0) / v.norm.length),
-    rawMean: r6(v.raw.reduce((a, x) => a + x, 0) / v.raw.length),
-    n: v.norm.length,
-  }));
-  rows.sort((a, b) => b.normalized - a.normalized || b.rawMean - a.rawMean || b.n - a.n || (a.projectId < b.projectId ? -1 : 1));
-  return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+  return centerAndRank(entries as CenterEntry[]);
 }
 
 const bodyOf = (req: FastifyRequest): Record<string, unknown> => (req.body ?? {}) as Record<string, unknown>;
@@ -745,7 +720,9 @@ export async function registerOrganizerPages(app: FastifyInstance): Promise<void
 
     const judgesQuery = `
       SELECT m.user_id, COALESCE(u.name, '') AS name, COALESCE(u.email, '') AS email,
-        t.name AS track_name,
+        COALESCE((SELECT string_agg(scope_track.name, ', ' ORDER BY scope_track.name)
+          FROM event_membership_tracks mt JOIN tracks scope_track ON scope_track.id = mt.track_id
+          WHERE mt.membership_id = m.id), t.name, CASE WHEN m.track_scope_all THEN 'All tracks' END) AS track_name,
         (SELECT COUNT(*)::int FROM judge_assignments a WHERE a.event_id = $1 AND a.judge_user_id = m.user_id AND a.status = 'active') AS assigned_count,
         (SELECT COUNT(*)::int FROM scores s WHERE s.event_id = $1 AND s.judge_user_id = m.user_id AND s.is_current = true) AS done_count
       FROM event_memberships m
@@ -902,7 +879,7 @@ export async function registerOrganizerPages(app: FastifyInstance): Promise<void
     if (!ev) return reply.code(404).send({ error: "not_found" });
 
     const projectsQuery = `
-      SELECT p.id, p.title, p.tagline, p.status, p.tech_tags,
+      SELECT p.id, p.title, p.tagline, p.status, p.tech_tags, p.needs_review, p.duplicate_of_project_id,
         t.name AS track_name,
         tm.name AS team_name
       FROM projects p
@@ -921,6 +898,26 @@ export async function registerOrganizerPages(app: FastifyInstance): Promise<void
       submittedCount,
       draftCount,
     });
+  });
+
+  app.post("/events/:eventId/projects/:projectId/resolve-duplicate", { preHandler: [organizeEvent] }, async (req, reply) => {
+    const { eventId, projectId } = req.params as { eventId: string; projectId: string };
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const duplicateId = typeof b.duplicate_of_project_id === "string" ? b.duplicate_of_project_id : "";
+    if (!UUID_RE.test(projectId) || !UUID_RE.test(duplicateId) || projectId === duplicateId)
+      return reply.code(422).send({ error: "invalid_duplicate_pair" });
+    const pair = await pool.query(`SELECT 1 FROM projects a JOIN projects b ON b.id = $3 AND b.team_id = a.team_id AND b.event_id = a.event_id WHERE a.id = $2 AND a.event_id = $1`, [eventId, projectId, duplicateId]);
+    if ((pair.rowCount ?? pair.rows.length) === 0) return reply.code(404).send({ error: "not_found" });
+    const action = b.action;
+    if (action === "keep") {
+      await pool.query(`UPDATE projects SET needs_review = false, duplicate_of_project_id = NULL, updated_at = now() WHERE id = $2 AND event_id = $1`, [eventId, projectId]);
+      await pool.query(`UPDATE projects SET needs_review = true, duplicate_of_project_id = $2, updated_at = now() WHERE id = $3 AND event_id = $1`, [eventId, projectId, duplicateId]);
+    } else if (action === "duplicate") {
+      await pool.query(`UPDATE projects SET needs_review = true, duplicate_of_project_id = $2, updated_at = now() WHERE id = $3 AND event_id = $1`, [eventId, projectId, duplicateId]);
+      await pool.query(`UPDATE projects SET needs_review = false, duplicate_of_project_id = NULL, updated_at = now() WHERE id = $2 AND event_id = $1`, [eventId, duplicateId]);
+    } else return reply.code(422).send({ error: "invalid_action" });
+    setFlash(req, "success", "Duplicate review resolved.");
+    return reply.code(302).redirect(`/events/${eventId}/projects`);
   });
 
   /**
@@ -1095,7 +1092,7 @@ export async function registerOrganizerPages(app: FastifyInstance): Promise<void
       return reply.code(302).redirect(`/events/${eventId}/judging-progress`);
     }
     const entries = await safe(() => pool.query<{ project_id: string; judge_user_id: string; value: string }>(
-      `SELECT project_id, judge_user_id, value FROM scores WHERE event_id = $1 AND is_current = true`, [eventId],
+      `SELECT s.project_id, s.judge_user_id, s.value FROM scores s JOIN projects p ON p.id = s.project_id WHERE s.event_id = $1 AND s.is_current = true AND p.needs_review = false`, [eventId],
     ).then((r) => r.rows.map((x) => ({ projectId: x.project_id, judgeId: x.judge_user_id, value: Number(x.value) })).filter((e) => Number.isFinite(e.value))), []);
     if (entries.length === 0) {
       setFlash(req, "error", "Nothing to finalize — no current scores yet.");

@@ -26,18 +26,11 @@
 
     <div class="discover-search__filters">
       <div class="form__group">
-        <label class="form__label" for="track">Track ID</label>
-        <input
-          class="form__input"
-          type="text"
-          id="track"
-          name="track"
-          value="{{ track | escape }}"
-          placeholder="Filter by track"
-          autocomplete="off"
-          aria-describedby="track-hint"
-        >
-        <p class="form__help track-hint" id="track-hint" data-track-hint hidden>That does not look like a valid track ID, so this filter is ignored and all tracks are shown. Clear the field to remove this message.</p>
+        <label class="form__label" for="track">Track</label>
+        <select class="form__input" id="track" name="track">
+          <option value="">All tracks</option>
+          {% for t in tracks %}<option value="{{ t.id }}"{% if track == t.id %} selected{% endif %}>{{ t.name }}</option>{% endfor %}
+        </select>
       </div>
 
       <div class="form__group">
@@ -67,7 +60,6 @@
     <li><a class="chip{% if tag == 'mobile' %} chip--active{% endif %}" href="/gallery?tag=mobile{% if q %}&amp;q={{ q | urlencode }}{% endif %}{% if track %}&amp;track={{ track | urlencode }}{% endif %}">Mobile</a></li>
     <li><a class="chip{% if tag == 'iot' %} chip--active{% endif %}" href="/gallery?tag=iot{% if q %}&amp;q={{ q | urlencode }}{% endif %}{% if track %}&amp;track={{ track | urlencode }}{% endif %}">IoT</a></li>
   </ul>
-
   {% if q or track or tag %}
   <p class="filter-notice text-muted text-center" role="status">Search or filters applied — <a href="/gallery">clear all filters</a>.</p>
   {% endif %}
@@ -116,6 +108,11 @@
     </li>
     {% endfor %}
   </ul>
+  <nav class="pagination" aria-label="Project pages">
+    {% if page > 1 %}<a class="button button--secondary button--sm" href="/gallery?page={{ page - 1 }}{% if q %}&amp;q={{ q | urlencode }}{% endif %}{% if track %}&amp;track={{ track | urlencode }}{% endif %}{% if tag %}&amp;tag={{ tag | urlencode }}{% endif %}">Previous</a>{% endif %}
+    <span aria-current="page">Page {{ page }}</span>
+    {% if hasNext %}<a class="button button--secondary button--sm" href="/gallery?page={{ page + 1 }}{% if q %}&amp;q={{ q | urlencode }}{% endif %}{% if track %}&amp;track={{ track | urlencode }}{% endif %}{% if tag %}&amp;tag={{ tag | urlencode }}{% endif %}">Next</a>{% endif %}
+  </nav>
   {% else %}
   <div class="empty-state discover-empty" role="status">
     <svg class="discover-empty__art" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="14" width="48" height="34" rx="6"></rect><circle cx="26" cy="27" r="5"></circle><path d="M12 44 L26 32 L38 41 L46 35 L56 42"></path></svg>

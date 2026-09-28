@@ -94,7 +94,7 @@ export async function registerParticipantSubmitPages(
       const up = await client.query<ProjectInfo>(
         `UPDATE projects SET status = 'submitted', updated_at = now()
           WHERE id = $1 AND status = 'draft'
-            AND (SELECT ((e.submissions_open_at IS NULL OR now() >= e.submissions_open_at) AND (e.submissions_close_at IS NULL OR now() <= e.submissions_close_at)) FROM events e WHERE e.id = $2)
+            AND (SELECT e.state = 'SUBMISSIONS_OPEN' AND (e.submissions_open_at IS NULL OR now() >= e.submissions_open_at) AND (e.submissions_close_at IS NULL OR now() <= e.submissions_close_at) FROM events e WHERE e.id = $2)
           RETURNING *`,
         [projectId, eventId],
       );

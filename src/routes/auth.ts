@@ -99,7 +99,7 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
         error: "invalid_input",
       });
     }
-    if (password.length < 8) {
+    if (password.length < 8 || password.length > 128) {
       return reply.code(422).type("application/json").send({
         error: "invalid_input",
       });
@@ -177,6 +177,9 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
         error: "invalid_input",
       });
     }
+    if (password.length > 128) return isForm
+      ? reply.code(422).view("login.njk", { csrfToken: req.csrfToken(), error: "Password must be 128 characters or fewer." })
+      : reply.code(422).type("application/json").send({ error: "invalid_input" });
 
     // ── Look up user ──────────────────────────────────────────
     const { rows } = await pool.query<{
@@ -276,7 +279,7 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
           error: "invalid_input",
         });
       }
-      if (newPassword.length < 8) {
+      if (newPassword.length < 8 || newPassword.length > 128 || currentPassword.length > 128) {
         return reply.code(422).type("application/json").send({
           error: "invalid_input",
         });

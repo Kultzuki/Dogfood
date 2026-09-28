@@ -51,13 +51,8 @@ function getUserId(req: { session: Record<string, unknown> }): string | undefine
 
 /** Team-membership check (mirrors the isTeamMember pattern in routes/projects.ts). */
 async function isTeamMember(teamId: string, userId: string): Promise<boolean> {
-  for (const table of ["team_members", "team_memberships"]) {
-    try {
-      const r = await pool.query(`SELECT 1 FROM ${table} WHERE team_id = $1 AND user_id = $2 LIMIT 1`, [teamId, userId]);
-      if ((r.rowCount ?? 0) > 0) return true;
-    } catch { /* table may not exist yet — try the next name */ }
-  }
-  return false;
+  const r = await pool.query(`SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 LIMIT 1`, [teamId, userId]);
+  return (r.rowCount ?? r.rows.length) > 0;
 }
 
 function checkQuestionBody(b: Record<string, unknown>): string | null {
@@ -133,6 +128,9 @@ export default async function galleryRoutes(app: FastifyInstance): Promise<void>
     const q = typeof query.q === "string" ? query.q : "";
     const track = typeof query.track === "string" ? query.track : "";
     const tag = typeof query.tag === "string" ? query.tag : "";
+    const rawPage = Number(query.page);
+    const page = Number.isInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 10000) : 1;
+    const pageSize = 12;
     // Garbage `track` values (non-UUID) must not reach the DB: the
     // track_id column is UUID-typed, so Postgres throws 22P02 and the
     // catch-all below would turn it into a 503. Ignore the filter
@@ -143,7 +141,12 @@ export default async function galleryRoutes(app: FastifyInstance): Promise<void>
         q,
         trackId,
         tag: tag || undefined,
+        limit: pageSize + 1,
+        offset: (page - 1) * pageSize,
       });
+      const hasNext = projects.length > pageSize;
+      projects.splice(pageSize);
+      const tracks = await pool.query<{ id: string; name: string }>(`SELECT DISTINCT t.id, t.name FROM tracks t JOIN projects p ON p.track_id = t.id WHERE p.status = 'submitted' ORDER BY t.name`);
       // T3 community signals (best-effort: a failure here must never fail
       // the public gallery — counts simply render as unavailable).
       let voteCounts: Record<string, number> = {};
@@ -184,6 +187,9 @@ export default async function galleryRoutes(app: FastifyInstance): Promise<void>
         track,
         tag,
         projects,
+        tracks: tracks.rows,
+        page,
+        hasNext,
         voteCounts,
         votesHidden,
         votingOpen,
@@ -191,7 +197,7 @@ export default async function galleryRoutes(app: FastifyInstance): Promise<void>
     } catch {
       return reply
         .code(503)
-        .view("gallery.njk", { q, track, tag, projects: [], dbDown: true });
+        .view("gallery.njk", { q, track, tag, projects: [], tracks: [], page, hasNext: false, dbDown: true });
     }
   });
 

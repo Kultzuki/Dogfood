@@ -14,6 +14,8 @@
       {% if project.tagline %}
       <p class="discover-hero__tagline text-muted">{{ project.tagline }}</p>
       {% endif %}
+      {% if project.repoUrl %}<p><a href="{{ project.repoUrl | escape }}" target="_blank" rel="noopener noreferrer">View source repository</a></p>{% endif %}
+      {% if project.demoUrl %}<p><a href="{{ project.demoUrl | escape }}" target="_blank" rel="noopener noreferrer">Open live demo</a></p>{% endif %}
       <p class="detail-meta">
         {% if trackName %}<span class="badge">Track: {{ trackName }}</span>{% endif %}
         {% if teamName %}<span class="badge">Team: {{ teamName }}</span>{% endif %}

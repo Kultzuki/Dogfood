@@ -43,7 +43,6 @@ type InjectResponse = Awaited<ReturnType<FastifyInstance["inject"]>>;
 beforeAll(async () => {
   app = Fastify({ logger: false });
   void app.decorateReply("view", function (template: string, data: unknown) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (this as any).code(200).send({ template, data });
   });
   await app.register(galleryRoutes);

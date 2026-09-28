@@ -171,8 +171,9 @@ export function requireTrackScope(resolveTrackId: TrackIdResolver) {
     // 4. Track scope check (defensive — table may not exist yet)
     try {
       const result = await pool.query(
-        `SELECT id FROM event_memberships
-         WHERE id = $1 AND (track_id = $2 OR track_id IS NULL)`,
+        `SELECT m.id FROM event_memberships m
+         WHERE m.id = $1 AND (m.role = 'organizer' OR m.track_scope_all = TRUE OR m.track_id = $2
+           OR EXISTS (SELECT 1 FROM event_membership_tracks mt WHERE mt.membership_id = m.id AND mt.track_id = $2))`,
         [membershipId, trackId],
       );
 

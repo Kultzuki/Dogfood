@@ -8,11 +8,13 @@ const JUDGE_1 = "66666666-6666-4666-8666-666666666666";
 const ASSIGN_1 = "77777777-7777-4777-8777-777777777777";
 const ASSIGN_2 = "88888888-8888-4888-8888-888888888888";
 const SCORE_1 = "99999999-9999-4999-8999-999999999999";
+const TRACK_1 = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
 const CRITERIA = { technical: 80, innovation: 90, impact: 70, polish: 85 };
 
 const canned = vi.hoisted(() => ({
   rubric: null as null | { version: number; weights: Record<string, number> },
+  eventState: "JUDGING",
   alreadyScored: false,
   oldScore: null as null | Record<string, unknown>,
   inserted: [] as Array<Record<string, unknown>>,
@@ -26,7 +28,7 @@ function assignmentRow(id: string): Record<string, unknown> {
     judge_user_id: JUDGE_1,
     track_id: null,
     status: "active",
-    project_track: null,
+    project_track: TRACK_1,
   };
 }
 
@@ -38,6 +40,7 @@ vi.mock("../db/index.js", () => ({
         const id = String(v[0] ?? "");
         return { rows: [assignmentRow(id)], rowCount: 1 };
       }
+      if (text.includes("SELECT state FROM events")) return { rows: [{ state: canned.eventState }], rowCount: 1 };
       if (text.includes("SELECT id, role FROM event_memberships")) {
         return { rows: [{ id: "m-1", role: "judge" }], rowCount: 1 };
       }
@@ -47,6 +50,7 @@ vi.mock("../db/index.js", () => ({
       if (text.includes("SELECT track_id FROM event_memberships")) {
         return { rows: [{ track_id: null }], rowCount: 1 };
       }
+      if (text.includes("SELECT m.id FROM event_memberships")) return { rows: [{ id: "m-1" }], rowCount: 1 };
       if (text.includes("FROM rubric_versions")) {
         if (canned.rubric) {
           return {
@@ -82,6 +86,7 @@ vi.mock("../db/index.js", () => ({
         ) {
           return { rows: [], rowCount: 0 };
         }
+        if (text.includes("SELECT state FROM events")) return { rows: [{ state: canned.eventState }], rowCount: 1 };
         if (text.includes("SELECT * FROM judge_assignments WHERE id")) {
           return { rows: [assignmentRow(String(vals[0] ?? ASSIGN_1))], rowCount: 1 };
         }
@@ -150,12 +155,23 @@ afterAll(async () => {
 
 beforeEach(() => {
   canned.rubric = null;
+  canned.eventState = "JUDGING";
   canned.alreadyScored = false;
   canned.oldScore = null;
   canned.inserted = [];
 });
 
 describe("judge scoring rubric bypass closure", () => {
+  it.each(["RESULTS_FINAL", "PUBLISHED"]) ("blocks API submit and rescore when event is %s", async (state) => {
+    canned.eventState = state;
+    const submit = await post("/api/scores", { assignment_id: ASSIGN_1, criteria: CRITERIA });
+    expect(submit.statusCode).toBe(409);
+    expect(submit.json()).toEqual({ error: "judging_closed" });
+    canned.oldScore = { id: SCORE_1, assignment_id: ASSIGN_1, event_id: EVENT_A, project_id: PROJECT_P, judge_user_id: JUDGE_1, value: 81, version: 1, supersedes_id: null, is_current: true, rubric_version: 1 };
+    const rescore = await post(`/api/scores/${SCORE_1}/rescore`, { criteria: CRITERIA });
+    expect(rescore.statusCode).toBe(409);
+    expect(rescore.json()).toEqual({ error: "judging_closed" });
+  });
   it("accepts valid criteria and computes the composite server-side (default 30/25/25/20)", async () => {
     const res = await post("/api/scores", { assignment_id: ASSIGN_1, criteria: CRITERIA });
     expect(res.statusCode).toBe(201);

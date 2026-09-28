@@ -15,17 +15,13 @@
  * dataset — simplest defensible posture; judges cannot export even their
  * own scores): 401 unauthenticated · 404 not-found (never 403) · 422 bad input.
  *
- * JUDGING ISOLATION: eslint.config.js bans `judging/` imports outside
- * src/judging, tests, and scripts — so `centerAndRank` below DUPLICATES the
- * 5-line centering math (raw − judgeMean + globalMean) instead of importing
- * the engine. Source of truth: src/judging/normalize.ts `normalizeCentering`,
- * src/judging/aggregate.ts `aggregateByProject`, src/judging/rank.ts
- * `rankProjects` (tie-break: normalized desc, rawMean desc, n desc,
- * projectId asc; round6 display values). Scores-normalized centers over
- * is_current=true rows only; filtering happens at the route layer.
+ * JUDGING ISOLATION: centerAndRank is the approved CSV/finalization adapter
+ * into src/judging/index.ts. Scores-normalized centers over is_current=true
+ * rows only; filtering happens at the route layer.
  */
 
 import { Readable } from "node:stream";
+import { runPipeline } from "../judging/index.js";
 
 // ── Column contracts ────────────────────────────────────────────────
 
@@ -224,49 +220,10 @@ export function round6(x: number): number {
   return r === 0 ? 0 : r;
 }
 
-function mean(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  let sum = 0;
-  for (const v of values) sum += v;
-  return sum / values.length;
-}
-
-/** Centered normalization + per-project aggregation + engine rank order. */
+/** Stable CSV adapter over the canonical competition judging pipeline. */
 export function centerAndRank(entries: readonly CenterEntry[]): RankedProject[] {
-  const usable = entries.filter((e) => Number.isFinite(e.value));
-  const globalMean = mean(usable.map((e) => e.value));
-  const byJudge = new Map<string, number[]>();
-  for (const e of usable) {
-    const b = byJudge.get(e.judgeId);
-    if (b === undefined) byJudge.set(e.judgeId, [e.value]);
-    else b.push(e.value);
-  }
-  const judgeMean = new Map<string, number>();
-  for (const [j, vs] of byJudge) judgeMean.set(j, mean(vs));
-  const byProject = new Map<string, { norm: number[]; raw: number[] }>();
-  for (const e of usable) {
-    const jm = judgeMean.get(e.judgeId) ?? globalMean;
-    const normed = e.value - jm + globalMean;
-    const b = byProject.get(e.projectId);
-    if (b === undefined) byProject.set(e.projectId, { norm: [normed], raw: [e.value] });
-    else {
-      b.norm.push(normed);
-      b.raw.push(e.value);
-    }
-  }
-  const rows = [...byProject].map(([projectId, b]) => ({
-    projectId,
-    normalized: round6(mean(b.norm)),
-    rawMean: round6(mean(b.raw)),
-    n: b.norm.length,
-  }));
-  rows.sort((a, b) => {
-    if (b.normalized !== a.normalized) return b.normalized - a.normalized;
-    if (b.rawMean !== a.rawMean) return b.rawMean - a.rawMean;
-    if (b.n !== a.n) return b.n - a.n;
-    return a.projectId < b.projectId ? -1 : 1;
-  });
-  return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+  return runPipeline(entries.map((e) => ({ projectId: e.projectId, judgeId: e.judgeId, value: e.value })), "centering").ranking
+    .map(({ projectId, normalized, rawMean, n, rank }) => ({ projectId, normalized, rawMean, n, rank }));
 }
 
 export function rankedToRecord(r: RankedProject): Record<string, string> {

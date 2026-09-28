@@ -17,6 +17,16 @@ The platform starts on `http://localhost:3000`. On first boot with
 `SESSION_SECRET` unset, a random secret is generated and persisted to the
 `appdata` volume (reused on restart).
 
+The first `docker compose up --build` needs network access to fetch the pinned
+base images and install locked npm packages. Once built and the images are
+present, application runtime and assets do not call external services.
+
+When serving behind a trusted reverse proxy, set `TRUST_PROXY` to `true` or
+to the proxy IP/CIDR so Fastify uses forwarded protocol/client information.
+Set `COOKIE_SECURE=true` to force Secure session cookies, or `false` when TLS
+is terminated upstream but the internal hop is plain HTTP. The default follows
+the request protocol; only trust forwarded headers from a proxy you control.
+
 ## Demo test accounts — OPT-IN, LOCAL SANDBOX ONLY ⚠️
 
 Disabled by default (`DOGFOOD_DEMO_ACCOUNTS=0`). Enable explicitly for
@@ -37,6 +47,14 @@ When enabled, four fixed password-loginable identities exist:
 
 Sign in normally at `http://localhost:3000`. One role per account, so
 cross-role isolation tests are meaningful.
+
+## Current limits
+
+- Judge invitations are currently direct membership assignment for an existing account. There is no pending invitation token flow for a judge who has not registered yet.
+- Webhook delivery retries use a database outbox and are triggered by an explicit request/sweep. There is no background worker, so a quiet service can leave due retries waiting.
+- Unresolved duplicate submissions are retained for organizer review and hidden from the public gallery, assignment creation/imports, and ranking output. The fixture `prj_41` is flagged against `prj_07`.
+
+The checked-in Vitest suite currently contains 32 test files and 271 tests; `.kilo/worktrees` is excluded by the `npm test` script.
 
 **They are disabled unless you opt in.** The default (`0` or unset) is a
 silent no-op. They are created through the same `users` table and scrypt
@@ -105,7 +123,15 @@ use it outside a local sandbox. With a normal boot (no `SESSION_SECRET`),
 copy the fresh `Cookie: sid=...` lines from the boot log into
 `.dogfood.toml` before running the checker.
 
-Current verdict: claimed `T1 T2`, verified `T1 T2` (7/7 checks pass).
+The base seed creates `admin@dogfood.local`. Set `ADMIN_BOOTSTRAP_PASSWORD`
+(12–128 characters) before the first seed, or read the randomly generated
+one-time password from the seed log. Idempotent seeding does not reset an
+existing admin password.
+
+The checked-in acceptance report is from an earlier run and has not been
+reproduced against the current working tree. `.dogfood.toml` conservatively
+claims T1 until the checker is rerun and the remaining T2 track-scope gaps are
+closed.
 T3 community voting + comments are implemented (authenticated one-vote-per-project
 with a per-event voting window, hidden counts while voting is active,
 deterministic per-voter ballots, attributed comments) and covered by

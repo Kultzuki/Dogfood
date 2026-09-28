@@ -32,7 +32,7 @@ function hashEntries(entries: CenterEntry[]): string {
 
 async function currentEntries(eventId: string): Promise<CenterEntry[]> {
   const r = await pool.query<{ project_id: string; judge_user_id: string; value: string | number }>(
-    `SELECT project_id, judge_user_id, value FROM scores WHERE event_id = $1 AND is_current = true`,
+    `SELECT s.project_id, s.judge_user_id, s.value FROM scores s JOIN projects p ON p.id = s.project_id WHERE s.event_id = $1 AND s.is_current = true AND p.needs_review = false`,
     [eventId],
   );
   const out: CenterEntry[] = [];
@@ -71,7 +71,7 @@ export default async function finalizeRoutes(app: FastifyInstance): Promise<void
     );
     if (latest.rows[0]?.input_hash === inputHash) {
       const rows = await pool.query(
-        `SELECT project_id, raw_mean, normalized, n, rank FROM event_rankings WHERE finalization_id = $1 ORDER BY rank ASC`,
+        `SELECT er.project_id, er.raw_mean, er.normalized, er.n, er.rank FROM event_rankings er JOIN projects p ON p.id = er.project_id WHERE er.finalization_id = $1 AND p.needs_review = false ORDER BY er.rank ASC`,
         [latest.rows[0].id],
       );
       return reply.send({ finalization_id: latest.rows[0].id, event_id: eventId, method, input_hash: inputHash, rankings: rows.rows, stale: false, deduped: true });
@@ -121,7 +121,7 @@ export default async function finalizeRoutes(app: FastifyInstance): Promise<void
     const fin = latest.rows[0];
     if (!fin) return reply.send({ event_id: eventId, rankings: [], finalized: false });
     const rows = await pool.query(
-      `SELECT project_id, raw_mean, normalized, n, rank FROM event_rankings WHERE finalization_id = $1 ORDER BY rank ASC`,
+      `SELECT er.project_id, er.raw_mean, er.normalized, er.n, er.rank FROM event_rankings er JOIN projects p ON p.id = er.project_id WHERE er.finalization_id = $1 AND p.needs_review = false ORDER BY er.rank ASC`,
       [fin.id],
     );
     let stale = false;

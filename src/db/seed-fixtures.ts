@@ -14,6 +14,7 @@ import { Pool } from "pg";
 import { hashPassword } from "../lib/password.js";
 import { signSessionValue } from "../plugins/session.js";
 import {
+  duplicateFixturePairs,
   parseFixture,
   trackSlug,
   scoreValue,
@@ -133,6 +134,19 @@ async function seedFixtures(): Promise<void> {
       if (!judgeAId || !judgeBId || !participantId) {
         throw new Error("fixture seed: skip-path users missing");
       }
+      const judges = fixture.judges;
+      for (const judge of judges) {
+        const userId = (await pool.query<IdRow>(`SELECT id FROM users WHERE email = $1`, [judge.email])).rows[0]?.id;
+        if (!userId) continue;
+        const membershipId = (await pool.query<IdRow>(`SELECT id FROM event_memberships WHERE event_id = $1 AND user_id = $2 AND role = 'judge'`, [existingEventId, userId])).rows[0]?.id;
+        if (!membershipId) continue;
+        await pool.query(`UPDATE event_memberships SET track_id = NULL, track_scope_all = FALSE WHERE id = $1`, [membershipId]);
+        await pool.query(`DELETE FROM event_membership_tracks WHERE membership_id = $1`, [membershipId]);
+        for (const fixtureTrack of judge.tracks) {
+          const trackId = (await pool.query<IdRow>(`SELECT id FROM tracks WHERE event_id = $1 AND slug = $2`, [existingEventId, fixtureTrack])).rows[0]?.id;
+          if (trackId) await pool.query(`INSERT INTO event_membership_tracks (membership_id, track_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [membershipId, trackId]);
+        }
+      }
       await upsertSession(pool, organizerId, FIXTURE_TOKENS.organizer);
       await upsertSession(pool, judgeAId, FIXTURE_TOKENS.judgeA);
       await upsertSession(pool, judgeBId, FIXTURE_TOKENS.judgeB);
@@ -229,8 +243,8 @@ async function seedFixtures(): Promise<void> {
       const trackId = trackUuidByFixture.get(p.track) ?? null;
       if (!teamId) throw new Error(`fixture seed: unknown team ${p.team}`);
       const r = await pool.query<IdRow>(
-        `INSERT INTO projects (event_id, team_id, track_id, title, tagline, description, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'submitted', $7, NOW()) RETURNING id`,
+        `INSERT INTO projects (event_id, team_id, track_id, title, tagline, description, repo_url, demo_url, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'submitted', $9, NOW()) RETURNING id`,
         [
           eventId,
           teamId,
@@ -238,6 +252,8 @@ async function seedFixtures(): Promise<void> {
           p.title,
           p.summary,
           projectDescription(p.summary, p.repoUrl),
+          p.repoUrl,
+          p.demoUrl || null,
           p.submittedAt,
         ],
       );
@@ -245,31 +261,37 @@ async function seedFixtures(): Promise<void> {
       if (!projectId) throw new Error(`fixture seed: project insert failed for ${p.id}`);
       projectUuidByFixture.set(p.id, projectId);
     }
+    const duplicatePairs = duplicateFixturePairs(fixture.projects);
+    const duplicateFixtureIds = new Set(duplicatePairs.map((pair) => pair.duplicateId));
+    for (const pair of duplicatePairs) {
+      const keepId = projectUuidByFixture.get(pair.keepId);
+      const duplicateId = projectUuidByFixture.get(pair.duplicateId);
+      if (keepId && duplicateId) await pool.query(
+        `UPDATE projects SET duplicate_of_project_id = $1, needs_review = true WHERE id = $2 AND event_id = $3`,
+        [keepId, duplicateId, eventId],
+      );
+    }
 
-    // Judges: users role judge + ONE event_membership each.
-    // Track-scope choice: single-track judges are scoped to that track;
-    // multi-track (or zero-track) judges get NULL (unscoped — may access all
-    // tracks in the event, per 0005_membership_track.sql semantics). NULL for
-    // multi-track judges avoids arbitrarily picking one of several tracks and
-    // keeps requireTrackScope checks passing for any of their projects.
+    // Judges have one membership and explicit allowed tracks in the join table.
     const judgeUuidByFixture = new Map<string, string>();
     for (const j of fixture.judges) {
       const userId = await ensureUser(pool, j.email, j.name, "judge");
       judgeUuidByFixture.set(j.id, userId);
-      let trackId: string | null = null;
-      if (j.tracks.length === 1) {
-        const only = j.tracks[0];
-        if (only) trackId = trackUuidByFixture.get(only) ?? null;
-      }
-      await pool.query(
+      const membership = await pool.query<{ id: string }>(
         `INSERT INTO event_memberships (event_id, user_id, role, track_id)
-         VALUES ($1, $2, 'judge', $3) ON CONFLICT (event_id, user_id) DO NOTHING`,
-        [eventId, userId, trackId],
+         VALUES ($1, $2, 'judge', NULL) ON CONFLICT (event_id, user_id) DO UPDATE SET role = 'judge' RETURNING id`,
+        [eventId, userId],
       );
+      const membershipId = membership.rows[0]?.id ?? (await pool.query<{ id: string }>(`SELECT id FROM event_memberships WHERE event_id = $1 AND user_id = $2`, [eventId, userId])).rows[0]?.id;
+      if (membershipId) for (const fixtureTrack of j.tracks) {
+        const trackId = trackUuidByFixture.get(fixtureTrack);
+        if (trackId) await pool.query(`INSERT INTO event_membership_tracks (membership_id, track_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [membershipId, trackId]);
+      }
     }
 
     // Scores: judge_assignments (active) + scores v1 is_current=true.
     for (const s of fixture.scores) {
+      if (duplicateFixtureIds.has(s.project)) continue;
       const judgeUserId = judgeUuidByFixture.get(s.judge);
       const projectId = projectUuidByFixture.get(s.project);
       if (!judgeUserId || !projectId) continue;

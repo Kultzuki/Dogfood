@@ -110,7 +110,6 @@ beforeAll(async () => {
     req.session = userId ? { id: "cert-test", userId } : { id: "cert-test" };
   });
   void app.decorateReply("view", function (template: string, data: unknown) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (this as any).code(200).send({ template, data });
   });
   await app.register(certificateRoutes);

@@ -238,7 +238,7 @@ async function sessionPlugin(app: FastifyInstance): Promise<void> {
           httpOnly: true,
           sameSite: "lax",
           path: "/",
-          secure: reply.request.protocol === "https",
+          secure: process.env.COOKIE_SECURE === "true" ? true : process.env.COOKIE_SECURE === "false" ? false : reply.request.protocol === "https",
           maxAge: COOKIE_MAX_AGE_S,
         });
       }

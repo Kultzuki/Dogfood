@@ -57,12 +57,21 @@
           {% for p in projects %}
           <tr class="table__row">
             <td class="table__cell">
+              {% if p.needs_review %}<span class="badge badge--warning">Duplicate review required</span>{% endif %}
               <strong>{{ p.title }}</strong>
               {% if p.tagline %}
               <div class="text-muted text-xs">{{ p.tagline }}</div>
               {% endif %}
             </td>
             <td class="table__cell">
+              {% if p.needs_review and p.duplicate_of_project_id %}
+              <form method="post" action="/events/{{ event.id }}/projects/{{ p.id }}/resolve-duplicate" class="flex gap-1">
+                <input type="hidden" name="_csrf" value="{{ csrfToken | escape }}">
+                <input type="hidden" name="duplicate_of_project_id" value="{{ p.duplicate_of_project_id | escape }}">
+                <button class="button button--secondary button--sm" name="action" value="keep">Keep this one</button>
+                <button class="button button--secondary button--sm" name="action" value="duplicate">Mark this duplicate</button>
+              </form>
+              {% endif %}
               {% if p.status == "submitted" %}
               <span class="badge badge--submitted">Submitted</span>
               {% else %}

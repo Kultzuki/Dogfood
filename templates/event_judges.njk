@@ -54,7 +54,7 @@
               {% if j.track_name %}
               <span class="badge badge--info">{{ j.track_name }}</span>
               {% else %}
-              <span class="badge">All tracks</span>
+              <span class="badge">No track scope</span>
               {% endif %}
             </td>
             <td class="table__cell">{{ j.assigned_count }}</td>
@@ -91,18 +91,18 @@
           <div class="split-view__pane form__group mb-0">
             <label class="form__label" for="judge-email">Judge Email or User ID</label>
             <input class="form__input" type="text" id="judge-email" name="identifier" required autocomplete="off" placeholder="judge@example.org or UUID">
-            <span class="form__help">The user must have a registered judge account.</span>
+            <span class="form__help">The judge must register an account first. Pending invitations are not supported yet.</span>
           </div>
 
           <div class="split-view__pane form__group mb-0">
-            <label class="form__label" for="judge-track">Track Scope (Optional)</label>
+            <label class="form__label" for="judge-track">Allowed Track</label>
             <select class="form__input" id="judge-track" name="trackId">
-              <option value="">All tracks (Unscoped)</option>
+              <option value="">No track access</option>
               {% for t in tracks %}
               <option value="{{ t.id }}">{{ t.name }}</option>
               {% endfor %}
             </select>
-            <span class="form__help">Restricts judge assignments and visibility to this track.</span>
+            <span class="form__help">Select one allowed track. Add another scope through the API or fixture configuration.</span>
           </div>
         </div>
 
