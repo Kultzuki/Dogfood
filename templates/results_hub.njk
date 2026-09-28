@@ -1,11 +1,12 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <div class="card__header card__header--split">
     <div>
       <h1 class="card__title card__title--left mb-0">Results &amp; Rankings Hub</h1>
-      <p class="text-muted">Oversee score normalization, persistent rankings, and results publication across events.</p>
+      <p class="text-muted j-page-intro">Oversee score normalization, persistent rankings, and results publication across events. Rankings appear only after finalization — unfinalized events show a pending guard.</p>
     </div>
     <a class="button button--secondary button--sm" href="/events">Manage Events</a>
   </div>
@@ -19,7 +20,7 @@
     </div>
 
     {% if events and events.length > 0 %}
-    <div class="event-card-list">
+    <div class="event-card-list j-event-grid">
       {% for e in events %}
       <div class="event-card">
         <div class="event-card__header">
@@ -60,10 +61,12 @@
           </div>
         </div>
 
-        <div class="event-card__footer">
+          <div class="event-card__footer">
           <div class="event-card__dates">
             {% if e.finalized_at %}
             <span>Finalized: {{ e.finalized_at }}</span>
+            {% elif e.state == "JUDGING" %}
+            <span>Judging in progress — finalize from Judging Progress once coverage is sufficient</span>
             {% else %}
             <span>Submissions close before finalization</span>
             {% endif %}

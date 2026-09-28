@@ -1,9 +1,20 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page page--xwide">
   <div class="card__header">
-    <h1 class="card__title">Judging Ballot</h1>
+    <div class="j-queue-head">
+      <div>
+        <h1 class="card__title">Judging Ballot</h1>
+        <p class="text-muted j-page-intro">Read the project brief, then score each criterion 0–100. The composite total updates live and is recomputed server-side on submit.</p>
+      </div>
+      {% if score %}
+      <span class="badge badge--scored">Scored — v{{ score.version }} ({{ score.value }})</span>
+      {% else %}
+      <span class="badge badge--pending">Pending — no score yet</span>
+      {% endif %}
+    </div>
     <p class="text-muted text-center">
       <a href="/events/{{ eventId }}/judge">Back to queue</a>
     </p>
@@ -21,7 +32,7 @@
   </div>
   {% endif %}
 
-  <div class="ballot-grid">
+  <div class="ballot-grid j-ballot-grid">
     <section class="card card--page" aria-label="Project details">
       <div class="card__header">
         <h2 class="card__title card__title--left">{{ project.title }}</h2>
@@ -33,15 +44,14 @@
         {% if project.description %}
         <p>{{ project.description }}</p>
         {% endif %}
-        {% if project.techTags and project.techTags.length > 0 %}
-        <p class="text-muted mt-2">Tags: {{ project.techTags | join(", ") }}</p>
-        {% endif %}
-        {% if trackName %}
-        <p class="text-muted mt-2">Track: {{ trackName }}</p>
-        {% else %}
-        <p class="text-muted mt-2">Track: General</p>
-        {% endif %}
-        <p class="text-muted mt-2">Status: {{ project.status }}</p>
+        <dl class="j-brief-list">
+          {% if project.techTags and project.techTags.length > 0 %}
+          <div class="j-brief-row"><dt class="j-brief-term text-muted">Tags</dt><dd>{{ project.techTags | join(", ") }}</dd></div>
+          {% endif %}
+          <div class="j-brief-row"><dt class="j-brief-term text-muted">Track</dt><dd>{% if trackName %}{{ trackName }}{% else %}General{% endif %}</dd></div>
+          <div class="j-brief-row"><dt class="j-brief-term text-muted">Status</dt><dd>{{ project.status }}</dd></div>
+          <div class="j-brief-row"><dt class="j-brief-term text-muted">Visibility</dt><dd>Only your score is recorded — peer scores are never shown.</dd></div>
+        </dl>
         {% if uploads and uploads.length > 0 %}
         <h3 class="mt-4">Files</h3>
         <ul class="flex flex-col gap-2 mt-2">
@@ -59,66 +69,91 @@
     <section class="card card--page" aria-label="Scoring form">
       <div class="card__header">
         <h2 class="card__title card__title--left">Score (v{{ rubric.version or 1 }} rubric)</h2>
-        <p class="text-muted">Technical {{ rubric.weights.technical or 30 }} · Innovation {{ rubric.weights.innovation or 25 }} · Impact {{ rubric.weights.impact or 25 }} · Polish {{ rubric.weights.polish or 20 }}</p>
+        <p class="text-muted j-stat-note" id="rubric-weights-hint">Weights — Technical {{ rubric.weights.technical or 30 }} · Innovation {{ rubric.weights.innovation or 25 }} · Impact {{ rubric.weights.impact or 25 }} · Polish {{ rubric.weights.polish or 20 }}. Each criterion is 0–100.</p>
       </div>
       <form class="form" method="post" action="/judge/assignments/{{ assignment.id }}" data-composite-form>
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
-        <div class="form__group">
-          <label class="form__label" for="f-technical">Technical excellence ({{ rubric.weights.technical or 30 }}%)</label>
-          <input
-            class="form__input"
-            type="number" id="f-technical" name="technical"
-            min="0" max="100" step="any" required
-            value="{{ values.technical }}"
-            data-criterion="technical" data-weight="{{ rubric.weights.technical or 30 }}">
+        <div class="j-rubric-row">
+          <div class="j-rubric-head">
+            <label class="form__label" for="f-technical">Technical excellence</label>
+            <span class="badge" id="w-technical">{{ rubric.weights.technical or 30 }}% weight</span>
+          </div>
+          <div class="j-score-input">
+            <input
+              class="form__input"
+              type="number" id="f-technical" name="technical"
+              min="0" max="100" step="any" required
+              value="{{ values.technical }}"
+              data-criterion="technical" data-weight="{{ rubric.weights.technical or 30 }}" aria-describedby="w-technical">
+            <span class="text-muted j-scale-note">0–100</span>
+          </div>
           {% if errors.technical %}
           <span class="form__error">{{ errors.technical }}</span>
           {% endif %}
         </div>
 
-        <div class="form__group">
-          <label class="form__label" for="f-innovation">Innovation ({{ rubric.weights.innovation or 25 }}%)</label>
-          <input
-            class="form__input"
-            type="number" id="f-innovation" name="innovation"
-            min="0" max="100" step="any" required
-            value="{{ values.innovation }}"
-            data-criterion="innovation" data-weight="{{ rubric.weights.innovation or 25 }}">
+        <div class="j-rubric-row">
+          <div class="j-rubric-head">
+            <label class="form__label" for="f-innovation">Innovation</label>
+            <span class="badge" id="w-innovation">{{ rubric.weights.innovation or 25 }}% weight</span>
+          </div>
+          <div class="j-score-input">
+            <input
+              class="form__input"
+              type="number" id="f-innovation" name="innovation"
+              min="0" max="100" step="any" required
+              value="{{ values.innovation }}"
+              data-criterion="innovation" data-weight="{{ rubric.weights.innovation or 25 }}" aria-describedby="w-innovation">
+            <span class="text-muted j-scale-note">0–100</span>
+          </div>
           {% if errors.innovation %}
           <span class="form__error">{{ errors.innovation }}</span>
           {% endif %}
         </div>
 
-        <div class="form__group">
-          <label class="form__label" for="f-impact">Impact ({{ rubric.weights.impact or 25 }}%)</label>
-          <input
-            class="form__input"
-            type="number" id="f-impact" name="impact"
-            min="0" max="100" step="any" required
-            value="{{ values.impact }}"
-            data-criterion="impact" data-weight="{{ rubric.weights.impact or 25 }}">
+        <div class="j-rubric-row">
+          <div class="j-rubric-head">
+            <label class="form__label" for="f-impact">Impact</label>
+            <span class="badge" id="w-impact">{{ rubric.weights.impact or 25 }}% weight</span>
+          </div>
+          <div class="j-score-input">
+            <input
+              class="form__input"
+              type="number" id="f-impact" name="impact"
+              min="0" max="100" step="any" required
+              value="{{ values.impact }}"
+              data-criterion="impact" data-weight="{{ rubric.weights.impact or 25 }}" aria-describedby="w-impact">
+            <span class="text-muted j-scale-note">0–100</span>
+          </div>
           {% if errors.impact %}
           <span class="form__error">{{ errors.impact }}</span>
           {% endif %}
         </div>
 
-        <div class="form__group">
-          <label class="form__label" for="f-polish">Polish ({{ rubric.weights.polish or 20 }}%)</label>
-          <input
-            class="form__input"
-            type="number" id="f-polish" name="polish"
-            min="0" max="100" step="any" required
-            value="{{ values.polish }}"
-            data-criterion="polish" data-weight="{{ rubric.weights.polish or 20 }}">
+        <div class="j-rubric-row">
+          <div class="j-rubric-head">
+            <label class="form__label" for="f-polish">Polish</label>
+            <span class="badge" id="w-polish">{{ rubric.weights.polish or 20 }}% weight</span>
+          </div>
+          <div class="j-score-input">
+            <input
+              class="form__input"
+              type="number" id="f-polish" name="polish"
+              min="0" max="100" step="any" required
+              value="{{ values.polish }}"
+              data-criterion="polish" data-weight="{{ rubric.weights.polish or 20 }}" aria-describedby="w-polish">
+            <span class="text-muted j-scale-note">0–100</span>
+          </div>
           {% if errors.polish %}
           <span class="form__error">{{ errors.polish }}</span>
           {% endif %}
         </div>
 
-        <p class="text-muted">
-          Weighted composite: <output data-composite-output>{{ compositePreview }}</output> / 100
-        </p>
+        <div class="j-total-sticky" role="status" aria-live="polite">
+          <span class="text-muted">Weighted composite</span>
+          <span class="j-total-value"><output data-composite-output>{{ compositePreview }}</output> / 100</span>
+        </div>
 
         <div class="form__actions">
           {% if score %}

@@ -1,24 +1,43 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/participant.css">
 <div class="card">
-  <div class="card__header">
-    <h1 class="card__title">Join Team</h1>
-    <p class="text-muted text-center">{{ eventName }}</p>
+  <div class="p-hero">
+    <p class="p-hero__eyebrow">Team up</p>
+    <h1 class="p-hero__title">Join Team</h1>
+    <p class="p-hero__sub">{{ eventName }}</p>
+    <div class="p-hero__meta">
+      <span>Team <strong>{{ team.name }}</strong></span>
+      <span><strong>{{ team.memberCount }}</strong> of <strong>{{ team.maxSize }}</strong> seats filled</span>
+    </div>
   </div>
-
 
   {% if error %}
   <div class="alert alert--error" role="alert">{{ error }}</div>
   {% endif %}
 
-  <div class="card__body">
-    <p>You are invited to join <strong>{{ team.name }}</strong>.</p>
-    <p class="text-muted">{{ team.memberCount }} of {{ team.maxSize }} seats filled.</p>
-    {% if alreadyMember %}
-    <div class="alert alert--warning" role="status">You are already on a team in this event. Joining another team is not allowed.</div>
-    {% endif %}
-  </div>
+  <section class="p-section" aria-labelledby="p-join-h">
+    <div class="p-section__head">
+      <div>
+        <h2 class="p-section__title" id="p-join-h">You are invited</h2>
+        <p class="p-section__desc">One step — confirm and you are on the roster.</p>
+      </div>
+    </div>
+    <div class="p-section__body">
+      <div class="p-team">
+        <span class="p-team__avatar" aria-hidden="true">{{ team.name.slice(0, 1) }}</span>
+        <div>
+          <p class="p-team__name">{{ team.name }}</p>
+          <p class="p-team__meta">{{ team.memberCount }} of {{ team.maxSize }} seats filled.</p>
+        </div>
+      </div>
+      <p class="mt-2">You are invited to join <strong>{{ team.name }}</strong>.</p>
+      {% if alreadyMember %}
+      <div class="alert alert--warning" role="status">You are already on a team in this event. Joining another team is not allowed.</div>
+      {% endif %}
+    </div>
+  </section>
 
   <form class="form" method="post" action="/events/{{ eventId }}/teams/join">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">

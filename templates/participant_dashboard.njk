@@ -1,55 +1,124 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/participant.css">
 <div class="card page">
-  <div class="card__header">
-    <h1 class="card__title">My Dashboard</h1>
-    <p class="text-muted text-center">{{ eventName }}</p>
-  </div>
-
-
-
-  <div class="card__body">
-    <h2>My Team</h2>
-    {% if team %}
-    <p><strong>{{ team.name }}</strong> <span class="text-muted">({{ team.memberCount }} members)</span></p>
-    <p><a href="/events/{{ eventId }}/my-team">View team &amp; invite link</a></p>
-    {% else %}
-    <p class="text-muted">You are not on a team yet.</p>
-    <p class="mt-2"><a class="button button--primary" href="/events/{{ eventId }}/teams/new">Create a team</a></p>
-    <p class="text-muted mt-2">…or ask a teammate for their team invite link to join.</p>
-    {% endif %}
-  </div>
-
-  <div class="card__body">
-    <h2>My Projects</h2>
-    {% if projects and projects.length > 0 %}
-    <ul class="gallery-grid mt-4">
-      {% for p in projects %}
-      <li class="card card--page project-card">
-        <div class="card__header">
-          <h2 class="card__title project-card__title">{{ p.title }}</h2>
-        </div>
-        <div class="card__body">
-          <p class="project-card__meta"><span class="badge badge--{{ p.status }}">{{ p.status }}</span></p>
-          <p class="mt-2">
-            <a href="/events/{{ eventId }}/projects/{{ p.id }}/edit">Edit</a>
-            — <a href="/events/{{ eventId }}/projects/{{ p.id }}/versions">Versions</a>
-          </p>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <div class="empty-state">
-      <p class="empty-state__title">No projects yet.</p>
-      <p class="empty-state__text">Create your first project once you have joined a team.</p>
+  <div class="p-hero">
+    <p class="p-hero__eyebrow">Builder dashboard</p>
+    <h1 class="p-hero__title">My Dashboard</h1>
+    <p class="p-hero__sub">{{ eventName }}</p>
+    <div class="p-hero__meta">
+      {% if team %}
+      <span>Team <strong>{{ team.name }}</strong></span>
+      <span><strong>{{ team.memberCount }}</strong> member{% if team.memberCount != 1 %}s{% endif %}</span>
+      <span><strong>{{ projects.length }}</strong> project{% if projects.length != 1 %}s{% endif %}</span>
+      {% else %}
+      <span>No team yet — create one or join with an invite link.</span>
+      {% endif %}
     </div>
-    {% endif %}
-    {% if team %}
-    <p class="mt-4"><a class="button button--primary" href="/events/{{ eventId }}/projects/new">New Project</a></p>
-    {% endif %}
-    <p class="mt-2"><a href="/gallery">Public gallery</a></p>
+    <div class="p-hero__actions">
+      {% if team %}
+      <a class="button button--primary" href="/events/{{ eventId }}/projects/new">New Project</a>
+      <a class="button button--secondary" href="/events/{{ eventId }}/my-team">View invite link</a>
+      {% else %}
+      <a class="button button--primary" href="/events/{{ eventId }}/teams/new">Create team</a>
+      {% endif %}
+      <a class="button button--secondary" href="/gallery">Public gallery</a>
+    </div>
+  </div>
+
+  <div class="p-layout">
+    <div>
+      <section class="p-section" aria-labelledby="p-projects-h">
+        <div class="p-section__head">
+          <div>
+            <h2 class="p-section__title" id="p-projects-h">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12"/></svg>
+              My Projects
+            </h2>
+            <p class="p-section__desc">Drafts live here until you review and submit them.</p>
+          </div>
+          {% if team %}
+          <a class="button button--primary button--sm" href="/events/{{ eventId }}/projects/new">New Project</a>
+          {% endif %}
+        </div>
+        <div class="p-section__body">
+          {% if projects and projects.length > 0 %}
+          <ul class="p-grid">
+            {% for p in projects %}
+            <li class="p-card">
+              <div class="p-card__cover p-card__cover--{{ p.status }}" aria-hidden="true"></div>
+              <div class="p-card__body">
+                <h3 class="p-card__title">{{ p.title }}</h3>
+                <p><span class="badge badge--{{ p.status }}">{{ p.status }}</span></p>
+                <p class="p-card__actions">
+                  <a class="button button--secondary button--sm" href="/events/{{ eventId }}/projects/{{ p.id }}/edit">Edit</a>
+                  <a class="button button--secondary button--sm" href="/events/{{ eventId }}/projects/{{ p.id }}/versions">Versions</a>
+                </p>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="empty-state">
+            <p class="empty-state__title">No projects yet.</p>
+            <p class="empty-state__text">Create your first project once you have joined a team.</p>
+            {% if team %}
+            <p class="mt-2"><a class="button button--primary" href="/events/{{ eventId }}/projects/new">New Project</a></p>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+
+    <aside aria-label="Team and next steps">
+      <section class="p-section" aria-labelledby="p-team-h">
+        <div class="p-section__head">
+          <div>
+            <h2 class="p-section__title" id="p-team-h">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="6" cy="5.5" r="2.5"/><path d="M1.5 13.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4"/><circle cx="11.5" cy="6.5" r="1.8"/><path d="M11 9.7c2 .3 3.5 1.6 3.5 3.8"/></svg>
+              My Team
+            </h2>
+          </div>
+        </div>
+        <div class="p-section__body">
+          {% if team %}
+          <div class="p-team">
+            <span class="p-team__avatar" aria-hidden="true">{{ team.name.slice(0, 1) }}</span>
+            <div>
+              <p class="p-team__name">{{ team.name }}</p>
+              <p class="p-team__meta">{{ team.memberCount }} member{% if team.memberCount != 1 %}s{% endif %}</p>
+            </div>
+          </div>
+          <p class="mt-2"><a class="button button--secondary button--sm" href="/events/{{ eventId }}/my-team">View team &amp; invite link</a></p>
+          {% else %}
+          <p class="text-muted">You are not on a team yet.</p>
+          <p class="mt-2"><a class="button button--primary" href="/events/{{ eventId }}/teams/new">Create a team</a></p>
+          <p class="p-help">…or ask a teammate for their team invite link to join.</p>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="p-section" aria-labelledby="p-next-h">
+        <div class="p-section__head">
+          <div>
+            <h2 class="p-section__title" id="p-next-h">Next steps</h2>
+          </div>
+        </div>
+        <div class="p-section__body">
+          <ol class="p-steps">
+            <li class="p-steps__item{% if team %} p-steps__item--done{% endif %}">
+              {% if team %}On team {{ team.name }}{% else %}<a href="/events/{{ eventId }}/teams/new">Create a team</a> or join via invite link{% endif %}
+            </li>
+            <li class="p-steps__item{% if projects and projects.length > 0 %} p-steps__item--done{% endif %}">
+              {% if projects and projects.length > 0 %}{{ projects.length }} project{% if projects.length != 1 %}s{% endif %} drafted{% else %}{% if team %}<a href="/events/{{ eventId }}/projects/new">Draft your first project</a>{% else %}Draft a project once teamed{% endif %}{% endif %}
+            </li>
+            <li class="p-steps__item"><a href="/gallery">Browse the public gallery</a></li>
+          </ol>
+        </div>
+      </section>
+    </aside>
   </div>
 </div>
 {% endblock %}

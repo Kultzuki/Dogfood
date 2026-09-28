@@ -2,44 +2,49 @@
 {% import "partials/nl2br.njk" as text %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/participant.css">
 <div class="card page">
-  <div class="card__header">
-    <h1 class="card__title">Versions — {{ project.title }}</h1>
-    <p class="text-muted text-center">Append-only snapshots. Every save creates a new version.</p>
-  </div>
-
-
-
-  <div class="card__body">
+  <div class="p-hero">
+    <p class="p-hero__eyebrow">Builder profile</p>
+    <h1 class="p-hero__title">Versions — {{ project.title }}</h1>
+    <p class="p-hero__sub">Append-only snapshots. Every save creates a new version.</p>
     {% if versions and versions.length > 0 %}
-    <ul class="flex flex-col gap-4">
-      {% for v in versions %}
-      <li class="card card--page">
-        <div class="card__header">
-          <h2 class="card__title card__title--left">Version {{ v.versionNo }}</h2>
-          <p class="text-muted"><span class="badge badge--{{ v.status }}">{{ v.status }}</span> — {{ v.createdAt }}</p>
-        </div>
-        <div class="card__body">
-          <p><strong>{{ v.title }}</strong></p>
-          {% if v.tagline %}
-          <p class="text-muted">{{ v.tagline }}</p>
-          {% endif %}
-          {% if v.description %}
-          <p>{{ text.nl2br(v.description) }}</p>
-          {% endif %}
-          {% if v.techTags and v.techTags.length > 0 %}
-          <p class="text-muted mt-2">Tags: {{ v.techTags | join(", ") }}</p>
-          {% endif %}
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <div class="empty-state">
-      <p class="empty-state__title">No versions recorded.</p>
+    <div class="p-hero__meta">
+      <span><strong>{{ versions.length }}</strong> version{% if versions.length != 1 %}s{% endif %}</span>
     </div>
     {% endif %}
-    <p class="mt-2"><a href="/events/{{ eventId }}/projects/{{ project.id }}/edit">Back to project</a></p>
   </div>
+
+  <p class="p-crumb"><a href="/events/{{ eventId }}/dashboard">Dashboard</a> &rsaquo; <a href="/events/{{ eventId }}/projects/{{ project.id }}/edit">Back to project</a> &rsaquo; Versions</p>
+
+  {% if versions and versions.length > 0 %}
+  <ul class="p-timeline">
+    {% for v in versions %}
+    <li class="p-timeline__item">
+      <div class="p-timeline__head">
+        <span class="p-timeline__ver">Version {{ v.versionNo }}</span>
+        <span><span class="badge badge--{{ v.status }}">{{ v.status }}</span> <span class="p-timeline__time">{{ v.createdAt }}</span></span>
+      </div>
+      <div class="p-timeline__body">
+        <p><strong>{{ v.title }}</strong></p>
+        {% if v.tagline %}
+        <p class="text-muted">{{ v.tagline }}</p>
+        {% endif %}
+        {% if v.description %}
+        <p>{{ text.nl2br(v.description) }}</p>
+        {% endif %}
+        {% if v.techTags and v.techTags.length > 0 %}
+        <p class="p-timeline__tags">Tags: {{ v.techTags | join(", ") }}</p>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty-state">
+    <p class="empty-state__title">No versions recorded.</p>
+  </div>
+  {% endif %}
+  <p class="mt-2"><a class="button button--secondary button--sm" href="/events/{{ eventId }}/projects/{{ project.id }}/edit">Back to project</a></p>
 </div>
 {% endblock %}

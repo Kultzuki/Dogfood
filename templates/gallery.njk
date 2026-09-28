@@ -1,108 +1,128 @@
 {% extends "layout.njk" %}
 
 {% block content %}
-<div class="card page">
-  <div class="card__header">
-    <h1 class="card__title">Project Gallery</h1>
-    <p class="text-muted text-center">Submitted projects from events open for showcase.</p>
-  </div>
+<link rel="stylesheet" href="/static/css/discover.css">
+<div class="discover">
+  <p class="discover__eyebrow">Discover</p>
+  <h1 class="discover__title">Explore hackathon projects</h1>
+  <p class="discover__sub">Search submitted projects from events open for showcase.</p>
 
-  <form class="form" method="get" action="/gallery" role="search">
-    <div class="form__group">
-      <label class="form__label" for="q">Search</label>
+  <form class="form discover-search" method="get" action="/gallery" role="search" aria-label="Search projects">
+    <div class="discover-search__input">
+      <svg class="discover-search__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="9" r="6"></circle><line x1="13.5" y1="13.5" x2="17" y2="17"></line></svg>
+      <label class="form__label" for="q" hidden>Search projects</label>
       <input
-        class="form__input"
+        class="discover-search__field"
         type="search"
         id="q"
         name="q"
         value="{{ q | escape }}"
-        placeholder="Search title, tagline, description, tags"
+        placeholder="Type to begin search, or use the global shortcut"
         autocomplete="off"
+        aria-label="Search projects"
       >
+      <span class="kbd" aria-hidden="true"><span>Ctrl</span><span>+</span><span>K</span></span>
     </div>
 
-    <div class="form__group">
-      <label class="form__label" for="track">Track ID</label>
-      <input
-        class="form__input"
-        type="text"
-        id="track"
-        name="track"
-        value="{{ track | escape }}"
-        placeholder="Filter by track"
-        autocomplete="off"
-        aria-describedby="track-hint"
-      >
-      <p class="form__help track-hint" id="track-hint" data-track-hint hidden>That does not look like a valid track ID, so this filter is ignored and all tracks are shown. Clear the field to remove this message.</p>
+    <div class="discover-search__filters">
+      <div class="form__group">
+        <label class="form__label" for="track">Track ID</label>
+        <input
+          class="form__input"
+          type="text"
+          id="track"
+          name="track"
+          value="{{ track | escape }}"
+          placeholder="Filter by track"
+          autocomplete="off"
+          aria-describedby="track-hint"
+        >
+        <p class="form__help track-hint" id="track-hint" data-track-hint hidden>That does not look like a valid track ID, so this filter is ignored and all tracks are shown. Clear the field to remove this message.</p>
+      </div>
+
+      <div class="form__group">
+        <label class="form__label" for="tag">Tech tag</label>
+        <input
+          class="form__input"
+          type="text"
+          id="tag"
+          name="tag"
+          value="{{ tag | escape }}"
+          placeholder="Filter by tech tag"
+          autocomplete="off"
+        >
+      </div>
     </div>
 
-    <div class="form__group">
-      <label class="form__label" for="tag">Tech tag</label>
-      <input
-        class="form__input"
-        type="text"
-        id="tag"
-        name="tag"
-        value="{{ tag | escape }}"
-        placeholder="Filter by tech tag"
-        autocomplete="off"
-      >
-    </div>
-
-    <div class="form__actions">
+    <div class="discover-search__actions form__actions">
       <button class="button button--primary" type="submit">Search</button>
       <a class="button button--secondary" href="/gallery">Clear</a>
     </div>
   </form>
 
-  <div class="card__body">
-    {% if q or track or tag %}
-    <p class="filter-notice text-muted text-center" role="status">Search or filters applied — <a href="/gallery">clear all filters</a>.</p>
-    {% endif %}
-    {% if dbDown %}
-    <div class="alert alert--warning" role="alert">
-      Gallery is temporarily unavailable. Please try again later.
-    </div>
-    {% elif projects and projects.length > 0 %}
-    <ul class="gallery-grid">
-      {% for p in projects %}
-      <li class="card card--page project-card">
-        <div class="card__header">
-          <h2 class="card__title project-card__title"><a href="/gallery/{{ p.id }}">{{ p.title }}</a></h2>
-          {% if p.tagline %}
-          <p class="text-muted">{{ p.tagline }}</p>
-          {% endif %}
-        </div>
-        <div class="card__body">
-          {% if p.description %}
-          <p>{{ p.description }}</p>
-          {% endif %}
-          {% if p.tech_tags and p.tech_tags.length > 0 %}
-          <ul class="tag-list" aria-label="Tech tags">
-            {% for t in p.tech_tags %}
-            <li class="tag">{{ t }}</li>
-            {% endfor %}
-          </ul>
-          {% endif %}
-          {% if voteCounts and voteCounts[p.id] !== undefined and not (votesHidden and votesHidden[p.id]) %}
-          <p class="form__help mt-2">{{ voteCounts[p.id] }} community votes · {{ p.event_name }}</p>
-          {% else %}
-          <p class="form__help mt-2">{{ p.event_name }}</p>
-          {% endif %}
-          {% if votingOpen and votingOpen[p.id] and currentUser %}
-          <p class="mt-2"><a class="button button--secondary button--sm" href="/events/{{ p.event_id }}/ballot">Vote</a></p>
-          {% endif %}
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <div class="empty-state">
-      <p class="empty-state__title">No submitted projects found.</p>
-      <p class="empty-state__text">Try clearing your search or filters.</p>
-      <p><a class="button button--secondary" href="/gallery">Clear search</a></p>
-    </div>
-    {% endif %}
+  <ul class="chip-row" aria-label="Quick tag filters">
+    <li><a class="chip{% if not tag %} chip--active{% endif %}" href="/gallery{% if q %}?q={{ q | urlencode }}{% endif %}">All</a></li>
+    <li><a class="chip{% if tag == 'ai' %} chip--active{% endif %}" href="/gallery?tag=ai{% if q %}&amp;q={{ q | urlencode }}{% endif %}{% if track %}&amp;track={{ track | urlencode }}{% endif %}">AI</a></li>
+    <li><a class="chip{% if tag == 'web' %} chip--active{% endif %}" href="/gallery?tag=web{% if q %}&amp;q={{ q | urlencode }}{% endif %}{% if track %}&amp;track={{ track | urlencode }}{% endif %}">Web</a></li>
+    <li><a class="chip{% if tag == 'mobile' %} chip--active{% endif %}" href="/gallery?tag=mobile{% if q %}&amp;q={{ q | urlencode }}{% endif %}{% if track %}&amp;track={{ track | urlencode }}{% endif %}">Mobile</a></li>
+    <li><a class="chip{% if tag == 'iot' %} chip--active{% endif %}" href="/gallery?tag=iot{% if q %}&amp;q={{ q | urlencode }}{% endif %}{% if track %}&amp;track={{ track | urlencode }}{% endif %}">IoT</a></li>
+  </ul>
+
+  {% if q or track or tag %}
+  <p class="filter-notice text-muted text-center" role="status">Search or filters applied — <a href="/gallery">clear all filters</a>.</p>
+  {% endif %}
+  {% if dbDown %}
+  <div class="alert alert--warning" role="alert">
+    Gallery is temporarily unavailable. Please try again later.
   </div>
+  {% elif projects and projects.length > 0 %}
+  <ul class="discover-grid gallery-grid">
+    {% for p in projects %}
+    {% set ci = loop.index0 % 4 %}
+    <li class="card card--page project-card">
+      <div class="project-card__cover cover--{% if ci == 0 %}a{% elif ci == 1 %}b{% elif ci == 2 %}c{% else %}d{% endif %}" aria-hidden="true">
+        <svg viewBox="0 0 400 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1"><circle cx="40" cy="30" r="24"></circle><circle cx="340" cy="90" r="36"></circle><circle cx="220" cy="20" r="12"></circle><path d="M0 100 L120 60 L240 95 L400 45"></path><path d="M0 110 L140 75 L260 105 L400 60"></path></g><g fill="#ffffff" fill-opacity="0.10"><rect x="300" y="14" width="52" height="52" rx="10" transform="rotate(12 326 40)"></rect><rect x="60" y="66" width="34" height="34" rx="8" transform="rotate(-10 77 83)"></rect></g></svg>
+      </div>
+      <div class="card__body project-card__body">
+        <h2 class="card__title project-card__title"><a href="/gallery/{{ p.id }}" aria-label="View {{ p.title }}">{{ p.title }}</a></h2>
+        {% if p.tagline %}
+        <p class="project-card__tagline text-muted">{{ p.tagline }}</p>
+        {% endif %}
+        {% if p.description %}
+        <p class="project-card__desc">{{ p.description }}</p>
+        {% endif %}
+        {% if p.tech_tags and p.tech_tags.length > 0 %}
+        <ul class="tag-list" aria-label="Tech tags">
+          {% for t in p.tech_tags %}
+          <li class="tag">{{ t }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        <div class="project-card__meta meta">
+          {% if voteCounts and voteCounts[p.id] !== undefined and not (votesHidden and votesHidden[p.id]) %}
+          <span class="project-card__votes" aria-label="{{ voteCounts[p.id] }} community votes">{{ voteCounts[p.id] }} votes</span>
+          {% endif %}
+          <span class="project-card__event">{{ p.event_name }}</span>
+          {% if votingOpen and votingOpen[p.id] and currentUser %}
+          <a class="button button--secondary button--sm" href="/events/{{ p.event_id }}/ballot" aria-label="Vote for {{ p.title }}">Vote</a>
+          {% endif %}
+        </div>
+        {% if not (voteCounts and voteCounts[p.id] !== undefined and not (votesHidden and votesHidden[p.id])) %}
+        <p class="form__help">{{ p.event_name }}</p>
+        {% else %}
+        <p class="form__help">{{ p.event_name }} · {{ voteCounts[p.id] }} community votes</p>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty-state discover-empty" role="status">
+    <svg class="discover-empty__art" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="14" width="48" height="34" rx="6"></rect><circle cx="26" cy="27" r="5"></circle><path d="M12 44 L26 32 L38 41 L46 35 L56 42"></path></svg>
+    <p class="empty-state__title discover-empty__title">No submitted projects found.</p>
+    <p class="empty-state__text discover-empty__text">Try clearing your search or filters.</p>
+    <p><a class="button button--secondary" href="/gallery">Clear search</a></p>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

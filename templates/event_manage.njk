@@ -1,6 +1,7 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <!-- Breadcrumb -->
   <nav class="breadcrumb" aria-label="Breadcrumb">
@@ -109,7 +110,7 @@
         <h2 class="hub-section__title mb-0">Event Setup Checklist</h2>
         <p class="section-desc">Track setup completeness across the event lifecycle.</p>
       </div>
-      <span class="text-muted text-sm font-semibold">
+      <span class="text-muted text-sm font-semibold j-checklist-meta">
         {{ checklistCompleted }} of {{ checklist.length }} complete
       </span>
     </div>
@@ -144,11 +145,17 @@
     <p class="section-desc">The competition lifecycle is enforced by server-side rules. Advance the state when your event progresses to the next stage.</p>
 
     <!-- Visual Stepper -->
-    <div class="stepper" role="navigation" aria-label="Event stages">
+    <div class="stepper j-stepper" role="navigation" aria-label="Event stages">
+      {% set pastDone = true %}
       {% for s in states %}
       {% if s == event.state %}
+      {% set pastDone = false %}
       <span class="stepper__step stepper__step--active" aria-current="step">
         <strong>{{ s | replace("_", " ") }}</strong>
+      </span>
+      {% elif pastDone %}
+      <span class="stepper__step stepper__step--past">
+        {{ s | replace("_", " ") }}
       </span>
       {% else %}
       <span class="stepper__step">
@@ -160,6 +167,7 @@
       {% endif %}
       {% endfor %}
     </div>
+    <p class="text-muted text-xs j-stepper__count">Lifecycle: DRAFT → REGISTRATION_OPEN → SUBMISSIONS_OPEN → SUBMISSIONS_CLOSED → JUDGING → RESULTS_FINAL → PUBLISHED → ARCHIVED. Completed stages dim; the current stage is highlighted.</p>
 
     <div class="hub-card mt-3">
       <p class="text-sm mb-2">

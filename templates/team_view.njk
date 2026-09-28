@@ -1,73 +1,125 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/participant.css">
 <div class="card">
-  <div class="card__header">
-    <h1 class="card__title">{{ team.name }}</h1>
-    <p class="text-muted text-center">{{ eventName }} — {{ memberCount }} of {{ maxSize }} seats filled</p>
-  </div>
-
-
-
-  <div class="card__body">
-    <h2>Roster</h2>
-    <p class="text-muted">Leader: <strong>{{ leaderName }}</strong></p>
-    <ul>
-      {% for m in members %}
-      <li>{{ m.name }} ({{ m.email }}) — joined {{ m.createdAt }}{% if m.name == leaderName %} <span class="badge badge--scored">leader</span>{% endif %}</li>
-      {% else %}
-      <li class="text-muted">No members yet.</li>
-      {% endfor %}
-    </ul>
-  </div>
-
-  {% if isLeader or isOrganizer %}
-  <div class="card__body">
-    <h2>Transfer leadership</h2>
-    <form class="form" method="post" action="/events/{{ eventId }}/my-team/leader">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <div class="form__group">
-        <label class="form__label" for="leader-select">New leader</label>
-        <select class="form__input" id="leader-select" name="leader_user_id">
-          {% for m in members %}
-          <option value="{{ m.id }}">{{ m.name }} ({{ m.email }})</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="form__actions">
-        <button class="button button--secondary" type="submit">Transfer leadership</button>
-      </div>
-    </form>
-  </div>
-  {% endif %}
-
-  <div class="card__body">
-    <h2>Leave team</h2>
-    <p class="text-muted">Leaving is blocked while the team has a submitted project. If you are the last member, the team is dissolved. If you are the leader, leadership passes to the longest-standing member.</p>
-    <form class="form" method="post" action="/events/{{ eventId }}/my-team/leave">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <div class="form__actions form__actions--start">
-        <button class="button button--danger" type="submit">Leave team</button>
-      </div>
-    </form>
-  </div>
-
-  <div class="card__body">
-    <h2>Invite Link</h2>
-    <p class="text-muted">Share this page link so teammates can join. It carries your team invite token.</p>
-    <div class="form__group">
-      <label class="form__label" for="invite-link">Team invite link</label>
-      <input class="form__input" type="text" id="invite-link" name="invite-link" value="{{ inviteUrl }}" readonly>
+  <div class="p-hero">
+    <p class="p-hero__eyebrow">Team up</p>
+    <h1 class="p-hero__title">{{ team.name }}</h1>
+    <p class="p-hero__sub">{{ eventName }}</p>
+    <div class="p-hero__meta">
+      <span><strong>{{ memberCount }}</strong> of <strong>{{ maxSize }}</strong> seats filled</span>
+      <span>Leader: <strong>{{ leaderName }}</strong></span>
     </div>
-    {% if isOrganizer %}
-    <form class="form" method="post" action="/events/{{ eventId }}/my-team/rotate">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <p class="form__help">Rotating invalidates the current link immediately.</p>
-      <div class="form__actions">
-        <button class="button button--secondary" type="submit">Rotate Invite Token</button>
-      </div>
-    </form>
-    {% endif %}
+    <div class="p-hero__actions">
+      <a class="button button--secondary" href="/events/{{ eventId }}/dashboard">Back to dashboard</a>
+    </div>
+  </div>
+
+  <p class="p-crumb"><a href="/events/{{ eventId }}/dashboard">Dashboard</a> &rsaquo; {{ team.name }}</p>
+
+  <div class="p-layout">
+    <div>
+      <section class="p-section" aria-labelledby="p-roster-h">
+        <div class="p-section__head">
+          <div>
+            <h2 class="p-section__title" id="p-roster-h">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="6" cy="5.5" r="2.5"/><path d="M1.5 13.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4"/><circle cx="11.5" cy="6.5" r="1.8"/><path d="M11 9.7c2 .3 3.5 1.6 3.5 3.8"/></svg>
+              Roster
+            </h2>
+            <p class="p-section__desc">Leader: <strong>{{ leaderName }}</strong></p>
+          </div>
+        </div>
+        <div class="p-section__body">
+          <ul class="p-roster">
+            {% for m in members %}
+            <li class="p-roster__item">
+              <span class="p-roster__dot" aria-hidden="true">{{ m.name.slice(0, 1) }}</span>
+              <div class="p-roster__who">
+                <p class="p-roster__name">{{ m.name }}{% if m.name == leaderName %} <span class="badge badge--scored">leader</span>{% endif %}</p>
+                <p class="p-roster__sub">{{ m.email }} — joined {{ m.createdAt }}</p>
+              </div>
+            </li>
+            {% else %}
+            <li class="text-muted">No members yet.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+
+      {% if isLeader or isOrganizer %}
+      <section class="p-section" aria-labelledby="p-transfer-h">
+        <div class="p-section__head">
+          <div>
+            <h2 class="p-section__title" id="p-transfer-h">Transfer leadership</h2>
+          </div>
+        </div>
+        <div class="p-section__body">
+          <form class="form" method="post" action="/events/{{ eventId }}/my-team/leader">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <div class="form__group">
+              <label class="form__label" for="leader-select">New leader</label>
+              <select class="form__input" id="leader-select" name="leader_user_id">
+                {% for m in members %}
+                <option value="{{ m.id }}">{{ m.name }} ({{ m.email }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form__actions">
+              <button class="button button--secondary" type="submit">Transfer leadership</button>
+            </div>
+          </form>
+        </div>
+      </section>
+      {% endif %}
+
+      <section class="p-section" aria-labelledby="p-leave-h">
+        <div class="p-section__head">
+          <div>
+            <h2 class="p-section__title" id="p-leave-h">Leave team</h2>
+            <p class="p-section__desc">Leaving is blocked while the team has a submitted project. If you are the last member, the team is dissolved. If you are the leader, leadership passes to the longest-standing member.</p>
+          </div>
+        </div>
+        <div class="p-section__body">
+          <form class="form" method="post" action="/events/{{ eventId }}/my-team/leave">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <div class="form__actions form__actions--start">
+              <button class="button button--danger" type="submit">Leave team</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <aside aria-label="Invite link">
+      <section class="p-section" aria-labelledby="p-invite-h">
+        <div class="p-section__head">
+          <div>
+            <h2 class="p-section__title" id="p-invite-h">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6.5 9.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1"/><path d="M9.5 6.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1"/></svg>
+              Invite Link
+            </h2>
+            <p class="p-section__desc">Share this page link so teammates can join. It carries your team invite token.</p>
+          </div>
+        </div>
+        <div class="p-section__body">
+          <div class="p-copybox">
+            <label class="p-copybox__label" for="invite-link">Team invite link</label>
+            <input class="p-copybox__input" type="text" id="invite-link" name="invite-link" value="{{ inviteUrl }}" readonly>
+            <p class="p-copybox__hint">Select-all + copy works with keyboard only; the field is readonly so it never submits.</p>
+          </div>
+          {% if isOrganizer %}
+          <form class="form" method="post" action="/events/{{ eventId }}/my-team/rotate">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <p class="form__help">Rotating invalidates the current link immediately.</p>
+            <div class="form__actions">
+              <button class="button button--secondary" type="submit">Rotate Invite Token</button>
+            </div>
+          </form>
+          {% endif %}
+        </div>
+      </section>
+    </aside>
   </div>
 </div>
 {% endblock %}

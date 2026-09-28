@@ -1,10 +1,20 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <div class="card__header">
-    <h1 class="card__title">Community Ballot</h1>
-    <p class="text-muted text-center">{{ eventName }} · one vote per project · order is shuffled per voter and stable on refresh</p>
+    <div class="j-queue-head">
+      <div>
+        <h1 class="card__title">Community Ballot</h1>
+        <p class="text-muted j-page-intro">{{ eventName }} · one vote per project · order is shuffled per voter and stable on refresh</p>
+      </div>
+      {% if votingActive %}
+      <span class="badge badge--pending">Voting open</span>
+      {% else %}
+      <span class="badge badge--success">Voting closed</span>
+      {% endif %}
+    </div>
   </div>
 
 
@@ -17,14 +27,14 @@
     {% endif %}
 
     {% if items and items.length > 0 %}
-    <ul class="gallery-grid mt-4">
+    <ol class="j-queue-grid mt-4">
       {% for it in items %}
-      <li class="card card--page project-card">
+      <li class="card card--page project-card j-card">
         <div class="card__header">
-          <h2 class="card__title project-card__title"><a href="/gallery/{{ it.id }}">{{ it.title }}</a></h2>
+          <h2 class="card__title project-card__title j-card__title"><a href="/gallery/{{ it.id }}">{{ it.title }}</a></h2>
         </div>
         <div class="card__body">
-          <p class="project-card__meta">
+          <p class="project-card__meta j-card__meta">
             {% if it.voted %}
             <span class="badge badge--scored">VOTED</span>
             {% elif votingActive %}
@@ -46,7 +56,7 @@
         </div>
       </li>
       {% endfor %}
-    </ul>
+    </ol>
     {% else %}
     <div class="empty-state">
       <p class="empty-state__title">No votable projects right now.</p>

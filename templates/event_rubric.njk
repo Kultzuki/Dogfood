@@ -1,6 +1,7 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <!-- Breadcrumb -->
   <nav class="breadcrumb" aria-label="Breadcrumb">
@@ -13,7 +14,7 @@
 
   <div class="card__header card__header--left">
     <h1 class="card__title card__title--left">Scoring Rubric Configuration</h1>
-    <p class="text-muted">Configure the 4 weighted judging criteria. Weights must sum to exactly 100%.</p>
+    <p class="text-muted j-page-intro">Configure the 4 weighted judging criteria. Weights must sum to exactly 100%.</p>
   </div>
 
   {% if error %}
@@ -38,36 +39,56 @@
     <form class="form form--flush" method="post" action="/events/{{ event.id }}/rubric">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
-      <div class="form__group">
-        <label class="form__label" for="technical">
-          <strong>Technical Execution (Weight %)</strong>
-          <span class="text-muted block text-xs font-normal">Code quality, software architecture, technical difficulty, complexity, and working functionality.</span>
-        </label>
-        <input class="form__input" type="number" id="technical" name="technical" min="0" max="100" step="1" required value="{{ activeRubric.weights.technical }}" data-criteria="rubric-total">
+      <div class="form__group j-rubric-row">
+        <div class="j-rubric-head">
+          <label class="form__label" for="technical">
+            <strong>Technical Execution (Weight %)</strong>
+          </label>
+          <span class="text-muted j-weight-hint" id="hint-technical">Code quality, architecture, difficulty, working functionality.</span>
+        </div>
+        <div class="j-score-input">
+          <input class="form__input" type="number" id="technical" name="technical" min="0" max="100" step="1" required value="{{ activeRubric.weights.technical }}" data-criteria="rubric-total" aria-describedby="hint-technical">
+          <span class="text-muted j-scale-note">0–100</span>
+        </div>
       </div>
 
-      <div class="form__group">
-        <label class="form__label" for="innovation">
-          <strong>Innovation &amp; Creativity (Weight %)</strong>
-          <span class="text-muted block text-xs font-normal">Originality of the idea, novel application of technology, creative problem solving.</span>
-        </label>
-        <input class="form__input" type="number" id="innovation" name="innovation" min="0" max="100" step="1" required value="{{ activeRubric.weights.innovation }}" data-criteria="rubric-total">
+      <div class="form__group j-rubric-row">
+        <div class="j-rubric-head">
+          <label class="form__label" for="innovation">
+            <strong>Innovation &amp; Creativity (Weight %)</strong>
+          </label>
+          <span class="text-muted j-weight-hint" id="hint-innovation">Originality, novel tech use, creative problem solving.</span>
+        </div>
+        <div class="j-score-input">
+          <input class="form__input" type="number" id="innovation" name="innovation" min="0" max="100" step="1" required value="{{ activeRubric.weights.innovation }}" data-criteria="rubric-total" aria-describedby="hint-innovation">
+          <span class="text-muted j-scale-note">0–100</span>
+        </div>
       </div>
 
-      <div class="form__group">
-        <label class="form__label" for="impact">
-          <strong>Impact &amp; Real-World Value (Weight %)</strong>
-          <span class="text-muted block text-xs font-normal">Practical usefulness, potential market or societal impact, solution viability.</span>
-        </label>
-        <input class="form__input" type="number" id="impact" name="impact" min="0" max="100" step="1" required value="{{ activeRubric.weights.impact }}" data-criteria="rubric-total">
+      <div class="form__group j-rubric-row">
+        <div class="j-rubric-head">
+          <label class="form__label" for="impact">
+            <strong>Impact &amp; Real-World Value (Weight %)</strong>
+          </label>
+          <span class="text-muted j-weight-hint" id="hint-impact">Usefulness, market or societal impact, viability.</span>
+        </div>
+        <div class="j-score-input">
+          <input class="form__input" type="number" id="impact" name="impact" min="0" max="100" step="1" required value="{{ activeRubric.weights.impact }}" data-criteria="rubric-total" aria-describedby="hint-impact">
+          <span class="text-muted j-scale-note">0–100</span>
+        </div>
       </div>
 
-      <div class="form__group">
-        <label class="form__label" for="polish">
-          <strong>Polish &amp; Design (Weight %)</strong>
-          <span class="text-muted block text-xs font-normal">User experience, visual design, demo quality, documentation, presentation.</span>
-        </label>
-        <input class="form__input" type="number" id="polish" name="polish" min="0" max="100" step="1" required value="{{ activeRubric.weights.polish }}" data-criteria="rubric-total">
+      <div class="form__group j-rubric-row">
+        <div class="j-rubric-head">
+          <label class="form__label" for="polish">
+            <strong>Polish &amp; Design (Weight %)</strong>
+          </label>
+          <span class="text-muted j-weight-hint" id="hint-polish">UX, visual design, demo quality, documentation.</span>
+        </div>
+        <div class="j-score-input">
+          <input class="form__input" type="number" id="polish" name="polish" min="0" max="100" step="1" required value="{{ activeRubric.weights.polish }}" data-criteria="rubric-total" aria-describedby="hint-polish">
+          <span class="text-muted j-scale-note">0–100</span>
+        </div>
       </div>
 
       <!-- Live Total Indicator -->

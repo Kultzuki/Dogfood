@@ -1,6 +1,7 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <!-- Breadcrumb -->
   <nav class="breadcrumb" aria-label="Breadcrumb">
@@ -14,7 +15,7 @@
   <div class="card__header card__header--split">
     <div>
       <h1 class="card__title card__title--left mb-0">Teams &amp; Participants</h1>
-      <p class="text-muted">Manage teams, invite links, and participant capacity for {{ event.name }}.</p>
+      <p class="text-muted j-page-intro">Manage teams, invite links, and participant capacity for {{ event.name }}.</p>
     </div>
     <a class="button button--secondary button--sm" href="/events/{{ event.id }}/manage">&larr; Back to Manage Event</a>
   </div>
@@ -52,8 +53,9 @@
               <span class="badge badge--info">{{ t.member_count }} / {{ t.max_size }}</span>
             </td>
             <td class="table__cell">
+              <label class="text-muted text-xs" for="invite-{{ t.id }}">Invite link</label>
               <div class="flex items-center gap-1">
-                <input class="form__input input-token" type="text" readonly value="{{ t.invite_url }}" onclick="this.select();">
+                <input class="form__input input-token" id="invite-{{ t.id }}" type="text" readonly value="{{ t.invite_url }}" onclick="this.select();">
               </div>
             </td>
             <td class="table__cell">

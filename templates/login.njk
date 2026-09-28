@@ -1,65 +1,81 @@
 {% extends "layout.njk" %}
 
 {% block content %}
-<div class="auth-split">
-  <div class="card card--page">
-    <div class="card__header">
-      <h1 class="card__title">Sign In</h1>
+<div class="auth-hero">
+  <div class="auth-hero__grid">
+    <div class="auth-hero__copy">
+      <span class="auth-hero__eyebrow">Hackathons, end to end</span>
+      <h1 class="auth-hero__title">Build something great this weekend.</h1>
+      <p class="auth-hero__lede">Dogfood covers registration, teams, submissions, fair rubric judging, and results — self-hosted, with competition integrity built in.</p>
+      <div class="auth-hero__points">
+        <p class="auth-hero__point"><span class="auth-hero__dot" aria-hidden="true"></span>Submit and track projects per event, right up to the real deadline.</p>
+        <p class="auth-hero__point"><span class="auth-hero__dot" aria-hidden="true"></span>Fair, weighted judge scoring with cross-judge normalization.</p>
+        <p class="auth-hero__point"><span class="auth-hero__dot" aria-hidden="true"></span>Browse the public project gallery and discover builders.</p>
+      </div>
+      <div class="auth-hero__stats" aria-label="Platform highlights">
+        <div class="auth-hero__stat">
+          <p class="auth-hero__stat-val">T1+T2</p>
+          <p class="auth-hero__stat-lbl">Core + judging</p>
+        </div>
+        <div class="auth-hero__stat">
+          <p class="auth-hero__stat-val">100%</p>
+          <p class="auth-hero__stat-lbl">Self-hosted</p>
+        </div>
+        <div class="auth-hero__stat">
+          <p class="auth-hero__stat-val">Offline</p>
+          <p class="auth-hero__stat-lbl">No CDN needed</p>
+        </div>
+      </div>
     </div>
-
-    {% if error %}
-    <div class="alert alert--error" role="alert">
-      {{ error }}
-    </div>
-    {% endif %}
-
-    <form class="form" method="post" action="/login">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-
-      <div class="form__group">
-        <label class="form__label" for="email">Email address</label>
-        <input
-          class="form__input"
-          type="email"
-          id="email"
-          name="email"
-          required
-          autocomplete="email"
-          placeholder="you@example.com"
-        >
+    <div class="card card--page auth-card">
+      <div class="card__header">
+        <h2 class="card__title">Sign In</h2>
       </div>
 
-      <div class="form__group">
-        <label class="form__label" for="password">Password</label>
-        <input
-          class="form__input"
-          type="password"
-          id="password"
-          name="password"
-          required
-          autocomplete="current-password"
-          placeholder="Password"
-        >
+      {% if error %}
+      <div class="alert alert--error alert--inset" role="alert">
+        {{ error }}
       </div>
+      {% endif %}
 
-      <div class="form__actions">
-        <button class="button button--primary" type="submit">Sign In</button>
+      <form class="form" method="post" action="/login">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        <div class="form__group">
+          <label class="form__label" for="email">Email address</label>
+          <input
+            class="form__input"
+            type="email"
+            id="email"
+            name="email"
+            required
+            autocomplete="email"
+            placeholder="you@example.com"
+          >
+        </div>
+
+        <div class="form__group">
+          <label class="form__label" for="password">Password</label>
+          <input
+            class="form__input"
+            type="password"
+            id="password"
+            name="password"
+            required
+            autocomplete="current-password"
+            placeholder="Password"
+          >
+        </div>
+
+        <div class="form__actions">
+          <button class="button button--primary" type="submit">Sign In</button>
+        </div>
+      </form>
+
+      <div class="card__footer">
+        <p class="form__link">No account yet? <a href="/register">Create one</a></p>
       </div>
-    </form>
-
-    <div class="card__footer">
-      <p class="form__link">No account yet? <a href="/register">Create one</a></p>
     </div>
   </div>
-
-  <aside class="auth-side" aria-label="About Dogfood">
-    <p class="auth-side__title">Ship your hackathon, end to end.</p>
-    <p class="auth-side__text">Dogfood covers registration, teams, submissions, judging, and results — self-hosted, with competition integrity built in.</p>
-    <ul class="auth-side__list">
-      <li>Submit and track projects per event</li>
-      <li>Fair, rubric-based judge scoring</li>
-      <li>Browse the public project gallery</li>
-    </ul>
-  </aside>
 </div>
 {% endblock %}

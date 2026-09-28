@@ -1,10 +1,11 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <div class="card__header text-left">
     <h1 class="card__title text-left">Organizer Dashboard</h1>
-    <p class="text-muted">Welcome back{% if currentUser and currentUser.name %}, {{ currentUser.name }}{% endif %}! Manage your hackathons, judging, teams, and results from here.</p>
+    <p class="text-muted j-page-intro">Welcome back{% if currentUser and currentUser.name %}, {{ currentUser.name }}{% endif %}! Manage your hackathons, judging, teams, and results from here.</p>
   </div>
 
   <!-- Overall Platform Metrics -->
@@ -40,6 +41,18 @@
       <a class="button button--secondary" href="/results">Results &amp; Rankings</a>
       <a class="button button--secondary" href="/gallery">Public Gallery</a>
     </div>
+
+    <!-- Setup Path Checklist (static guidance; per-event progress lives on Manage Event) -->
+    <div class="hub-card hub-card--flush">
+      <h2 class="text-base mb-1">Event setup path</h2>
+      <ol class="guidance-card__steps">
+        <li>Create event → configure schedule &amp; deadlines</li>
+        <li>Add tracks &amp; prizes → invite judges → configure rubric weights</li>
+        <li>Open registration → open submissions → close submissions</li>
+        <li>Advance to judging → monitor progress → finalize → publish</li>
+      </ol>
+      <p class="text-muted text-xs mb-0">Lifecycle order: DRAFT → REGISTRATION_OPEN → SUBMISSIONS_OPEN → SUBMISSIONS_CLOSED → JUDGING → RESULTS_FINAL → PUBLISHED → ARCHIVED.</p>
+    </div>
   </div>
 
   <!-- Events List -->
@@ -53,7 +66,7 @@
     </div>
 
     {% if events and events.length > 0 %}
-    <div class="event-card-list">
+    <div class="event-card-list j-event-grid">
       {% for e in events %}
       <div class="event-card">
         <div class="event-card__header">

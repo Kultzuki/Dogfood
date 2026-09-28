@@ -1,11 +1,13 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/participant.css">
 <div class="card page">
-  <div class="card__header card__header--split">
+  <div class="card__header card__header--split p-hero">
     <div>
-      <h1 class="card__title card__title--left">My Events</h1>
-      <p class="text-muted">Manage your hackathons, configure tracks and prizes, and oversee judging and results.</p>
+      <p class="p-hero__eyebrow">Events</p>
+      <h1 class="card__title card__title--left p-hero__title">My Events</h1>
+      <p class="text-muted p-hero__sub">Manage your hackathons, configure tracks and prizes, and oversee judging and results.</p>
     </div>
     <a class="button button--primary" href="/events/new">+ Create Event</a>
   </div>
@@ -14,7 +16,8 @@
     {% if events and events.length > 0 %}
     <div class="event-card-list">
       {% for e in events %}
-      <div class="event-card">
+      <div class="event-card p-card">
+        <div class="p-card__cover" aria-hidden="true"></div>
         <div class="event-card__header">
           <div>
             <h2 class="text-xl mb-1">
@@ -51,22 +54,22 @@
         <p class="event-card__desc">{{ e.description }}</p>
         {% endif %}
 
-        <div class="event-card__metrics">
-          <div class="event-card__metric">
-            <span class="event-card__metric-val">{{ e.team_count }}</span>
-            <span class="event-card__metric-lbl">Teams</span>
+        <div class="event-card__metrics p-stats">
+          <div class="event-card__metric p-stat">
+            <span class="event-card__metric-val p-stat__val">{{ e.team_count }}</span>
+            <span class="event-card__metric-lbl p-stat__lbl">Teams</span>
           </div>
-          <div class="event-card__metric">
-            <span class="event-card__metric-val">{{ e.project_count }}</span>
-            <span class="event-card__metric-lbl">Projects ({{ e.submitted_project_count }} submitted)</span>
+          <div class="event-card__metric p-stat">
+            <span class="event-card__metric-val p-stat__val">{{ e.project_count }}</span>
+            <span class="event-card__metric-lbl p-stat__lbl">Projects ({{ e.submitted_project_count }} submitted)</span>
           </div>
-          <div class="event-card__metric">
-            <span class="event-card__metric-val">{{ e.judge_count }}</span>
-            <span class="event-card__metric-lbl">Judges</span>
+          <div class="event-card__metric p-stat">
+            <span class="event-card__metric-val p-stat__val">{{ e.judge_count }}</span>
+            <span class="event-card__metric-lbl p-stat__lbl">Judges</span>
           </div>
-          <div class="event-card__metric">
-            <span class="event-card__metric-val">{{ e.score_count }}</span>
-            <span class="event-card__metric-lbl">Scores</span>
+          <div class="event-card__metric p-stat">
+            <span class="event-card__metric-val p-stat__val">{{ e.score_count }}</span>
+            <span class="event-card__metric-lbl p-stat__lbl">Scores</span>
           </div>
         </div>
 

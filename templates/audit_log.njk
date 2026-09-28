@@ -1,10 +1,11 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <div class="card__header">
     <h1 class="card__title">Audit Log</h1>
-    <p class="text-muted text-center">{{ event.name }} · latest {{ total }} entries (capped at 200)</p>
+    <p class="text-muted j-page-intro">{{ event.name }} · latest {{ total }} entries (capped at 200)</p>
   </div>
 
   <div class="card__body">
@@ -13,7 +14,7 @@
     {% else %}
     <div class="alert alert--error" role="alert">Hash chain broken at seq {{ chain.badSeq }}.</div>
     {% endif %}
-    <p class="text-muted mt-2">Showing page {{ page }} of {{ pages }} (50 per page). Use ?page=N to page through the latest 200 entries.</p>
+    <p class="text-muted mt-2 j-table-note">Showing page {{ page }} of {{ pages }} (50 per page). Use ?page=N to page through the latest 200 entries. Entries are append-only and never edited.</p>
   </div>
 
   <div class="card__body">

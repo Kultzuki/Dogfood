@@ -1,40 +1,60 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/participant.css">
 <div class="card">
-  <div class="card__header">
-    <h1 class="card__title">Create a Team</h1>
-    <p class="text-muted text-center">{{ eventName }}</p>
+  <div class="p-hero">
+    <p class="p-hero__eyebrow">Team up</p>
+    <h1 class="p-hero__title">Create a Team</h1>
+    <p class="p-hero__sub">{{ eventName }}</p>
   </div>
 
+  <p class="p-crumb"><a href="/events/{{ eventId }}/dashboard">Dashboard</a> &rsaquo; Create a Team</p>
 
   {% if error %}
   <div class="alert alert--error" role="alert">{{ error }}</div>
   {% endif %}
 
   {% if alreadyTeamed %}
-  <div class="card__body">
-    <p class="text-muted">You are already on a team in this event. Leave it first to create a new one.</p>
-    <p><a href="/events/{{ eventId }}/my-team">View my team</a></p>
-  </div>
-  {% else %}
-  <form class="form" method="post" action="/events/{{ eventId }}/teams/new">
-    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    <div class="card__body">
-      <div class="form__group">
-        <label class="form__label" for="team-name">Team name</label>
-        <input class="form__input" type="text" id="team-name" name="name" required maxlength="255" autocomplete="off" placeholder="Night Owls">
-      </div>
-      <div class="form__group">
-        <label class="form__label" for="team-size">Max team size</label>
-        <input class="form__input" type="number" id="team-size" name="max_size" min="1" max="20" value="4">
-        <span class="form__help">1 to 20 members. You automatically join as the team leader.</span>
-      </div>
-      <div class="form__actions">
-        <button class="button button--primary" type="submit">Create team</button>
+  <section class="p-section" aria-labelledby="p-teamed-h">
+    <div class="p-section__head">
+      <div>
+        <h2 class="p-section__title" id="p-teamed-h">Already teamed</h2>
       </div>
     </div>
-  </form>
+    <div class="p-section__body">
+      <p class="text-muted">You are already on a team in this event. Leave it first to create a new one.</p>
+      <p class="mt-2"><a class="button button--secondary" href="/events/{{ eventId }}/my-team">View my team</a></p>
+    </div>
+  </section>
+  {% else %}
+  <section class="p-section" aria-labelledby="p-create-h">
+    <div class="p-section__head">
+      <div>
+        <h2 class="p-section__title" id="p-create-h">Team details</h2>
+        <p class="p-section__desc">You automatically join as the team leader and get an invite link to share.</p>
+      </div>
+    </div>
+    <div class="p-section__body">
+      <form class="form" method="post" action="/events/{{ eventId }}/teams/new">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <div class="form__group">
+          <label class="form__label" for="team-name">Team name</label>
+          <input class="form__input" type="text" id="team-name" name="name" required maxlength="255" autocomplete="off" placeholder="Night Owls">
+          <p class="p-help">Shown on the roster, the gallery, and judging sheets.</p>
+        </div>
+        <div class="form__group">
+          <label class="form__label" for="team-size">Max team size</label>
+          <input class="form__input" type="number" id="team-size" name="max_size" min="1" max="20" value="4">
+          <span class="form__help">1 to 20 members. You automatically join as the team leader.</span>
+        </div>
+        <div class="form__actions">
+          <button class="button button--primary" type="submit">Create team</button>
+          <a class="button button--secondary" href="/events/{{ eventId }}/dashboard">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </section>
   {% endif %}
 </div>
 {% endblock %}

@@ -2,58 +2,68 @@
 {% import "partials/nl2br.njk" as text %}
 
 {% block content %}
-<div class="card page">
-  <div class="card__header">
-    <h1 class="card__title">{{ project.title }}</h1>
-    {% if project.tagline %}
-    <p class="text-muted text-center">{{ project.tagline }}</p>
-    {% endif %}
-  </div>
+<link rel="stylesheet" href="/static/css/discover.css">
+<div class="discover-detail">
+  <article class="discover-hero" aria-labelledby="project-title">
+    <div class="discover-hero__cover cover--b" aria-hidden="true">
+      <svg viewBox="0 0 800 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.5"><circle cx="80" cy="50" r="40"></circle><circle cx="680" cy="130" r="56"></circle><circle cx="430" cy="30" r="18"></circle><path d="M0 140 L200 90 L420 130 L800 60"></path><path d="M0 155 L240 110 L460 145 L800 80"></path></g><g fill="#ffffff" fill-opacity="0.10"><rect x="600" y="24" width="84" height="84" rx="16" transform="rotate(12 642 66)"></rect><rect x="120" y="100" width="52" height="52" rx="12" transform="rotate(-10 146 126)"></rect></g></svg>
+    </div>
+    <div class="discover-hero__body">
+      <p class="discover__eyebrow">Project showcase · {{ eventName }}</p>
+      <h1 class="discover-hero__title" id="project-title">{{ project.title }}</h1>
+      {% if project.tagline %}
+      <p class="discover-hero__tagline text-muted">{{ project.tagline }}</p>
+      {% endif %}
+      <p class="detail-meta">
+        {% if trackName %}<span class="badge">Track: {{ trackName }}</span>{% endif %}
+        {% if teamName %}<span class="badge">Team: {{ teamName }}</span>{% endif %}
+        <span class="badge">{{ eventName }}</span>
+        {% if voteCount !== null and voteCount !== undefined %}
+        <span class="badge badge--scored">{{ voteCount }} community votes</span>
+        {% endif %}
+        {% if userVoted %}
+        <span class="badge badge--scored">YOU VOTED</span>
+        {% endif %}
+      </p>
+      {% if project.techTags and project.techTags.length > 0 %}
+      <ul class="tag-list" aria-label="Tech tags">
+        {% for t in project.techTags %}
+        <li class="tag">{{ t }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% if votingOpen and currentUser and eventId %}
+      {% if userVoted %}
+      <p class="text-muted mt-2" role="status">You voted for this project — one vote per project is counted.</p>
+      {% else %}
+      <form class="form form--flush mt-2" method="post" action="/events/{{ eventId }}/ballot">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="project_id" value="{{ projectId }}">
+        <div class="form__actions form__actions--start">
+          <button class="button button--primary button--sm" type="submit" aria-label="Vote for {{ project.title }}">Vote for this project</button>
+        </div>
+      </form>
+      {% endif %}
+      {% endif %}
+    </div>
+  </article>
 
-  <div class="card__body">
+  <section class="discover-detail__section" aria-labelledby="about-heading">
+    <h2 id="about-heading">About this project</h2>
     {% if project.description %}
     <p>{{ text.nl2br(project.description) }}</p>
-    {% endif %}
-    <p class="detail-meta">
-      {% if trackName %}<span class="badge">Track: {{ trackName }}</span>{% endif %}
-      {% if teamName %}<span class="badge">Team: {{ teamName }}</span>{% endif %}
-      <span class="badge">{{ eventName }}</span>
-      {% if voteCount !== null and voteCount !== undefined %}
-      <span class="badge badge--scored">{{ voteCount }} community votes</span>
-      {% endif %}
-      {% if userVoted %}
-      <span class="badge badge--scored">YOU VOTED</span>
-      {% endif %}
-    </p>
-    {% if project.techTags and project.techTags.length > 0 %}
-    <ul class="tag-list" aria-label="Tech tags">
-      {% for t in project.techTags %}
-      <li class="tag">{{ t }}</li>
-      {% endfor %}
-    </ul>
-    {% endif %}
-    {% if votingOpen and currentUser and eventId %}
-    {% if userVoted %}
-    <p class="text-muted mt-2">You voted for this project — one vote per project is counted.</p>
     {% else %}
-    <form class="form form--flush mt-2" method="post" action="/events/{{ eventId }}/ballot">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <input type="hidden" name="project_id" value="{{ projectId }}">
-      <div class="form__actions form__actions--start">
-        <button class="button button--primary button--sm" type="submit">Vote for this project</button>
-      </div>
-    </form>
+    <p class="text-muted">No description provided yet.</p>
     {% endif %}
-    {% endif %}
-    <p class="detail-back"><a href="/gallery">Back to gallery</a></p>
-  </div>
+    <p class="detail-back discover-detail__back"><a href="/gallery">Back to gallery</a></p>
+  </section>
 
-  <div class="card__body">
-    <h2>Comments</h2>
+  <section class="discover-detail__section" aria-labelledby="comments-heading">
+    <h2 id="comments-heading">Comments</h2>
     {% if comments and comments.length > 0 %}
-    <ul class="flex flex-col gap-4 mt-2">
+    <ul class="comment-list flex flex-col gap-4 mt-2">
       {% for c in comments %}
-      <li class="card card--page">
+      <li class="card card--page comment-card">
         <div class="card__body">
           <p>{{ text.nl2br(c.body) }}</p>
           <p class="form__help mt-2">{{ c.author }} · {{ c.created_at }}</p>
@@ -62,7 +72,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    <p class="text-muted">No comments yet.</p>
+    <p class="text-muted" role="status">No comments yet.</p>
     {% endif %}
     {% if currentUser %}
     <form class="form form--flush-x mt-2" method="post" action="/gallery/{{ projectId }}/comments">
@@ -79,6 +89,6 @@
     {% else %}
     <p class="text-muted mt-2"><a href="/">Sign in</a> to post a comment.</p>
     {% endif %}
-  </div>
+  </section>
 </div>
 {% endblock %}

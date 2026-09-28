@@ -1,14 +1,25 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <div class="card__header">
-    <h1 class="card__title">Judging Progress</h1>
-    <p class="text-muted text-center">{{ event.name }} · coverage target k={{ k }} reviews per project</p>
+    <div class="j-queue-head">
+      <div>
+        <h1 class="card__title">Judging Progress</h1>
+        <p class="text-muted j-page-intro">{{ event.name }} · coverage target k={{ k }} reviews per project</p>
+      </div>
+      {% if finalization %}
+      <span class="badge badge--success">Finalized</span>
+      {% else %}
+      <span class="badge badge--pending">Not finalized</span>
+      {% endif %}
+    </div>
   </div>
 
   <div class="card__body">
     <h2>Judges</h2>
+    <p class="text-muted j-table-note">Per-judge completion. Individual ballots stay private — only counts are shown.</p>
     {% if judges and judges.length > 0 %}
     <ul class="flex flex-col gap-4 mt-2">
       {% for j in judges %}
@@ -31,6 +42,7 @@
 
   <div class="card__body">
     <h2>Project coverage</h2>
+    <p class="text-muted j-table-note">Projects below k={{ k }} reviews need more assignments.</p>
     {% if coverage and coverage.length > 0 %}
     <ul class="flex flex-col gap-4 mt-2">
       {% for c in coverage %}
@@ -54,52 +66,54 @@
 
   <div class="card__body">
     <h2>Finalize results</h2>
-    {% if finalization %}
-    <p class="text-muted">Finalized {{ finalization.createdAt }} · method {{ finalization.method }} · input {{ finalization.inputShort }}…</p>
-    {% if stale %}
-    <div class="alert alert--error" role="alert">Scores changed since finalization — results are stale. Re-finalize to refresh.</div>
-    {% else %}
-    <p class="text-muted">Rankings are up to date for the current scores.</p>
-    {% endif %}
-    {% if rankings and rankings.length > 0 %}
-    <div class="table-wrapper mt-2">
-      <table class="table">
-        <thead class="table__head">
-          <tr class="table__row">
-            <th class="table__header-cell" scope="col">Rank</th>
-            <th class="table__header-cell" scope="col">Project</th>
-            <th class="table__header-cell" scope="col">Normalized</th>
-            <th class="table__header-cell" scope="col">Raw mean</th>
-            <th class="table__header-cell" scope="col">n</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in rankings %}
-          <tr class="table__row">
-            <td class="table__cell">#{{ r.rank }}</td>
-            <td class="table__cell">{{ r.project_id }}</td>
-            <td class="table__cell">{{ r.normalized }}</td>
-            <td class="table__cell">{{ r.raw_mean }}</td>
-            <td class="table__cell">{{ r.n }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
-    {% else %}
-    <p class="text-muted">Not finalized yet. Finalization persists the centering rankings so results are reproducible.</p>
-    {% endif %}
-    {% if canFinalize %}
-    <form class="form form--flush" method="post" action="/events/{{ event.id }}/judging-progress">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <div class="form__actions form__actions--start">
-        <button class="button button--primary button--sm" type="submit">{% if finalization %}Re-finalize results{% else %}Finalize results{% endif %}</button>
+    <div class="j-guard-box">
+      {% if finalization %}
+      <p class="text-muted">Finalized {{ finalization.createdAt }} · method {{ finalization.method }} · input {{ finalization.inputShort }}…</p>
+      {% if stale %}
+      <div class="alert alert--error" role="alert">Scores changed since finalization — results are stale. Re-finalize to refresh.</div>
+      {% else %}
+      <p class="text-muted">Rankings are up to date for the current scores.</p>
+      {% endif %}
+      {% if rankings and rankings.length > 0 %}
+      <div class="table-wrapper mt-2">
+        <table class="table">
+          <thead class="table__head">
+            <tr class="table__row">
+              <th class="table__header-cell" scope="col">Rank</th>
+              <th class="table__header-cell" scope="col">Project</th>
+              <th class="table__header-cell" scope="col">Normalized</th>
+              <th class="table__header-cell" scope="col">Raw mean</th>
+              <th class="table__header-cell" scope="col">n</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rankings %}
+            <tr class="table__row">
+              <td class="table__cell">#{{ r.rank }}</td>
+              <td class="table__cell">{{ r.project_id }}</td>
+              <td class="table__cell">{{ r.normalized }}</td>
+              <td class="table__cell">{{ r.raw_mean }}</td>
+              <td class="table__cell">{{ r.n }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-    </form>
-    {% else %}
-    <p class="text-muted">Finalization opens in SUBMISSIONS_CLOSED or later (now {{ event.state }}).</p>
-    {% endif %}
+      {% endif %}
+      {% else %}
+      <p class="text-muted">Not finalized yet. Finalization persists the centering rankings so results are reproducible. Finalize only when coverage looks sufficient — this guard message is your checklist.</p>
+      {% endif %}
+      {% if canFinalize %}
+      <form class="form form--flush" method="post" action="/events/{{ event.id }}/judging-progress">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <div class="form__actions form__actions--start">
+          <button class="button button--primary button--sm" type="submit">{% if finalization %}Re-finalize results{% else %}Finalize results{% endif %}</button>
+        </div>
+      </form>
+      {% else %}
+      <p class="text-muted">Finalization opens in SUBMISSIONS_CLOSED or later (now {{ event.state }}).</p>
+      {% endif %}
+    </div>
   </div>
 
   <div class="card__body">

@@ -1,10 +1,16 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card">
   <div class="card__header">
-    <h1 class="card__title">New Event</h1>
-    <p class="text-muted text-center">Create a hackathon event. You become its organizer.</p>
+    <div class="j-queue-head">
+      <div>
+        <h1 class="card__title">New Event</h1>
+        <p class="text-muted j-page-intro">Create a hackathon event. You become its organizer.</p>
+      </div>
+      <span class="badge">Step 1 of setup</span>
+    </div>
   </div>
 
   {% if error %}

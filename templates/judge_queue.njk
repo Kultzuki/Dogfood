@@ -1,26 +1,50 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <div class="card__header">
-    <h1 class="card__title">Judging Queue</h1>
-    <p class="text-muted text-center">{{ scored }} of {{ total }} ({{ pct }}%)</p>
-    <p class="text-muted text-center">Track scope: {{ scopeLabel }}</p>
+    <div class="j-queue-head">
+      <div>
+        <h1 class="card__title">Judging Queue</h1>
+        <p class="text-muted j-page-intro">Score only the projects assigned to you. Your scores stay private to organizers — no peer scores are shown here.</p>
+      </div>
+      <div class="j-queue-summary" aria-label="Queue summary">
+        <span class="badge {% if scored == total and total > 0 %}badge--success{% else %}badge--pending{% endif %}">{{ scored }} of {{ total }} scored ({{ pct }}%)</span>
+        <span class="badge">Track scope: {{ scopeLabel }}</span>
+      </div>
+    </div>
+    {% if items and items.length > 0 %}
+    <div class="j-progress-track">
+      <progress class="progress-bar" value="{{ scored }}" max="{{ total }}" aria-label="Judging progress: {{ scored }} of {{ total }}"></progress>
+      <div class="j-progress-meta">
+        <span class="text-muted">{{ scored }} scored · {{ total - scored }} pending</span>
+        <span class="text-muted">{{ pct }}% complete</span>
+      </div>
+    </div>
+    {% endif %}
   </div>
   <div class="card__body">
     {% if items and items.length > 0 %}
-    <progress class="progress-bar" value="{{ scored }}" max="{{ total }}" aria-label="Judging progress"></progress>
-    <ul class="gallery-grid mt-4">
+    <ol class="j-queue-grid">
       {% for it in items %}
-      <li class="card card--page project-card">
+      <li class="card card--page project-card j-card">
         <div class="card__header">
-          <h2 class="card__title project-card__title">{{ it.projectTitle }}</h2>
+          <div class="j-card__top">
+            <span class="j-card__index text-muted">#{{ loop.index }} of {{ total }}</span>
+            {% if it.state == "SCORED" %}
+            <span class="badge badge--scored">Scored</span>
+            {% else %}
+            <span class="badge badge--pending">Pending</span>
+            {% endif %}
+          </div>
+          <h2 class="card__title project-card__title j-card__title">{{ it.projectTitle }}</h2>
           {% if it.projectTagline %}
-          <p class="text-muted">{{ it.projectTagline }}</p>
+          <p class="text-muted j-card__tagline">{{ it.projectTagline }}</p>
           {% endif %}
         </div>
         <div class="card__body">
-          <p class="project-card__meta">
+          <p class="project-card__meta j-card__meta">
             {% if it.trackName %}
             <span class="badge">Track: {{ it.trackName }}</span>
             {% else %}
@@ -28,19 +52,23 @@
             {% endif %}
             {% if it.state == "SCORED" %}
             <span class="badge badge--scored">SCORED (v{{ it.version }}, {{ it.value }})</span>
-            {% else %}
-            <span class="badge badge--pending">PENDING</span>
             {% endif %}
           </p>
-          <p class="mt-4">
-            <a class="button button--secondary button--sm" href="/judge/assignments/{{ it.assignmentId }}">Open ballot</a>
-          </p>
+          <div class="j-card__foot">
+            {% if it.state == "SCORED" %}
+            <span class="text-muted j-deadline">Submitted · v{{ it.version }}</span>
+            {% else %}
+            <span class="text-muted j-deadline">Awaiting your score</span>
+            {% endif %}
+            <a class="button button--secondary button--sm" href="/judge/assignments/{{ it.assignmentId }}">{% if it.state == "SCORED" %}Review / rescore{% else %}Score{% endif %}</a>
+          </div>
         </div>
       </li>
       {% endfor %}
-    </ul>
+    </ol>
     {% else %}
     <div class="empty-state">
+      <svg class="j-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
       <p class="empty-state__title">No assignments in scope.</p>
       <p class="empty-state__text">Assignments appear here once an organizer assigns this event or track to you.</p>
     </div>

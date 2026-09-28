@@ -1,10 +1,11 @@
 {% extends "layout.njk" %}
 
 {% block content %}
-<div class="card page">
-  <div class="card__header">
-    <h1 class="card__title">My Account</h1>
-    <p class="text-muted text-center">Profile information and event access</p>
+<div class="card page card--page">
+  <div class="card__header account-head">
+    <span class="auth-hero__eyebrow">Account</span>
+    <h1 class="card__title card__title--left">My Account</h1>
+    <p class="text-muted">Profile information and event access for {{ user.name | escape }}</p>
   </div>
 
   <div class="card__body">

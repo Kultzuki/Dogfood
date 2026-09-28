@@ -2,12 +2,23 @@
 {% import "partials/nl2br.njk" as text %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/participant.css">
 <div class="card page">
-  <div class="card__header">
-    <h1 class="card__title">{% if mode == "new" %}New Project{% elif mode == "confirm" %}Confirm Submission{% else %}Edit Project{% endif %}</h1>
-    <p class="text-muted text-center">{{ eventName }}</p>
+  <div class="p-hero">
+    <p class="p-hero__eyebrow">Builder profile</p>
+    <h1 class="p-hero__title">{% if mode == "new" %}New Project{% elif mode == "confirm" %}Confirm Submission{% else %}Edit Project{% endif %}</h1>
+    <p class="p-hero__sub">{{ eventName }}</p>
+    {% if deadlineText %}
+    <div class="p-hero__meta">
+      <span class="p-deadline">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5V8l2.5 1.5"/></svg>
+        <span>{{ deadlineText }}</span>
+      </span>
+    </div>
+    {% endif %}
   </div>
 
+  <p class="p-crumb"><a href="/events/{{ eventId }}/dashboard">Dashboard</a> &rsaquo; {% if mode == "new" %}New Project{% elif mode == "confirm" %}Confirm Submission{% else %}Edit Project{% endif %}</p>
 
   {% if error %}
   <div class="alert alert--error" role="alert">{{ error }}</div>
@@ -17,79 +28,117 @@
   {% endif %}
 
   {% if mode == "confirm" %}
-  <div class="card__body">
-    <p>Review your project before submitting. Submission is final for this draft step and uses the server clock for the deadline.</p>
-    <p><strong>{{ project.title }}</strong> <span class="badge badge--{{ project.status }}">{{ project.status }}</span></p>
-    {% if project.tagline %}
-    <p class="text-muted">{{ project.tagline }}</p>
-    {% endif %}
-    {% if project.description %}
-    <p>{{ text.nl2br(project.description) }}</p>
-    {% endif %}
-    <form class="form" method="post" action="{{ submitAction }}">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <div class="form__actions">
-        <button class="button button--primary" type="submit">Confirm Submission</button>
-        <a class="button button--secondary" href="/events/{{ eventId }}/projects/{{ project.id }}/edit">Back to Edit</a>
+  <section class="p-section" aria-labelledby="p-confirm-h">
+    <div class="p-section__head">
+      <div>
+        <h2 class="p-section__title" id="p-confirm-h">Review before submitting</h2>
+        <p class="p-section__desc">Submission is final for this draft step and uses the server clock for the deadline.</p>
       </div>
-    </form>
-  </div>
+    </div>
+    <div class="p-section__body">
+      <div class="p-confirm-summary">
+        <p><strong>{{ project.title }}</strong> <span class="badge badge--{{ project.status }}">{{ project.status }}</span></p>
+        {% if project.tagline %}
+        <p class="text-muted">{{ project.tagline }}</p>
+        {% endif %}
+        {% if project.description %}
+        <p>{{ text.nl2br(project.description) }}</p>
+        {% endif %}
+      </div>
+      <form class="form" method="post" action="{{ submitAction }}">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <div class="form__actions">
+          <button class="button button--primary" type="submit">Confirm Submission</button>
+          <a class="button button--secondary" href="/events/{{ eventId }}/projects/{{ project.id }}/edit">Back to Edit</a>
+        </div>
+      </form>
+    </div>
+  </section>
   {% else %}
   <form class="form" method="post" action="{{ formAction }}">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
-    <div class="form__group">
-      <label class="form__label" for="title">Title</label>
-      <input class="form__input" type="text" id="title" name="title" required maxlength="255" value="{{ project.title }}">
-    </div>
+    <section class="p-section" aria-labelledby="p-basics-h">
+      <div class="p-section__head">
+        <div>
+          <h2 class="p-section__title" id="p-basics-h"><span class="p-section__num" aria-hidden="true">1</span> Basics</h2>
+          <p class="p-section__desc">Name your build the way it should appear in the public gallery.</p>
+        </div>
+      </div>
+      <div class="p-section__body">
+        <div class="form__group">
+          <label class="form__label" for="title">Title</label>
+          <input class="form__input" type="text" id="title" name="title" required maxlength="255" value="{{ project.title }}" placeholder="Realtime caption engine">
+        </div>
 
-    <div class="form__group">
-      <label class="form__label" for="tagline">Tagline</label>
-      <input class="form__input" type="text" id="tagline" name="tagline" maxlength="255" value="{{ project.tagline }}">
-    </div>
+        <div class="form__group">
+          <label class="form__label" for="tagline">Tagline</label>
+          <input class="form__input" type="text" id="tagline" name="tagline" maxlength="255" value="{{ project.tagline }}" placeholder="One-line pitch — what does it do?">
+          <p class="p-help">Shown under the title in the gallery. Keep it under 255 characters.</p>
+        </div>
 
-    <div class="form__group">
-      <label class="form__label" for="description">Description (plain text)</label>
-      <textarea class="form__input" id="description" name="description" rows="8">{{ project.description }}</textarea>
-      <p class="form__help">Plain text only. Line breaks are preserved; no formatting markup is rendered.</p>
-    </div>
+        <div class="form__group">
+          <label class="form__label" for="description">Description (plain text)</label>
+          <textarea class="form__input" id="description" name="description" rows="8" placeholder="Problem, approach, stack, what you built this weekend…">{{ project.description }}</textarea>
+          <p class="form__help">Plain text only. Line breaks are preserved; no formatting markup is rendered.</p>
+        </div>
+      </div>
+    </section>
 
-    <div class="form__group">
-      <label class="form__label" for="track">Track</label>
-      <select class="form__input" id="track" name="track_id">
-        <option value="">No track</option>
-        {% for t in tracks %}
-        <option value="{{ t.id }}"{% if project.trackId == t.id %} selected{% endif %}>{{ t.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    <section class="p-section" aria-labelledby="p-track-h">
+      <div class="p-section__head">
+        <div>
+          <h2 class="p-section__title" id="p-track-h"><span class="p-section__num" aria-hidden="true">2</span> Track &amp; stack</h2>
+          <p class="p-section__desc">Help judges route your project to the right rubric.</p>
+        </div>
+      </div>
+      <div class="p-section__body">
+        <div class="form__group">
+          <label class="form__label" for="track">Track</label>
+          <select class="form__input" id="track" name="track_id">
+            <option value="">No track</option>
+            {% for t in tracks %}
+            <option value="{{ t.id }}"{% if project.trackId == t.id %} selected{% endif %}>{{ t.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
 
-    <div class="form__group">
-      <label class="form__label" for="tech-tags">Tech tags (comma separated)</label>
-      <input class="form__input" type="text" id="tech-tags" name="tech_tags" value="{{ techTagsRaw }}" placeholder="node, postgres, css">
-    </div>
+        <div class="form__group">
+          <label class="form__label" for="tech-tags">Tech tags (comma separated)</label>
+          <input class="form__input" type="text" id="tech-tags" name="tech_tags" value="{{ techTagsRaw }}" placeholder="node, postgres, css">
+          <p class="p-help">Lowercase, comma separated — powers gallery search.</p>
+        </div>
+      </div>
+    </section>
 
     {% if questions and questions.length > 0 %}
-    <div class="card__body">
-      <h2>Additional Questions</h2>
-      {% for q in questions %}
-      <div class="form__group">
-        <label class="form__label" for="answer-{{ q.id }}">{{ q.label }}{% if q.required %} (required){% endif %}</label>
-        {% if q.qtype == "choice" %}
-        <select class="form__input" id="answer-{{ q.id }}" name="answer_{{ q.id }}">
-          <option value="">Select an option</option>
-          {% for opt in q.options %}
-          <option value="{{ opt }}"{% if answers[q.id] == opt %} selected{% endif %}>{{ opt }}</option>
-          {% endfor %}
-        </select>
-        {% elif q.qtype == "number" %}
-        <input class="form__input" type="number" id="answer-{{ q.id }}" name="answer_{{ q.id }}" value="{{ answers[q.id] }}">
-        {% else %}
-        <input class="form__input" type="text" id="answer-{{ q.id }}" name="answer_{{ q.id }}" maxlength="2000" value="{{ answers[q.id] }}">
-        {% endif %}
+    <section class="p-section" aria-labelledby="p-extra-h">
+      <div class="p-section__head">
+        <div>
+          <h2 class="p-section__title" id="p-extra-h"><span class="p-section__num" aria-hidden="true">3</span> Additional Questions</h2>
+          <p class="p-section__desc">Set by the organizers for this event.</p>
+        </div>
       </div>
-      {% endfor %}
-    </div>
+      <div class="p-section__body">
+        {% for q in questions %}
+        <div class="form__group">
+          <label class="form__label" for="answer-{{ q.id }}">{{ q.label }}{% if q.required %} (required){% endif %}</label>
+          {% if q.qtype == "choice" %}
+          <select class="form__input" id="answer-{{ q.id }}" name="answer_{{ q.id }}">
+            <option value="">Select an option</option>
+            {% for opt in q.options %}
+            <option value="{{ opt }}"{% if answers[q.id] == opt %} selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+          {% elif q.qtype == "number" %}
+          <input class="form__input" type="number" id="answer-{{ q.id }}" name="answer_{{ q.id }}" value="{{ answers[q.id] }}">
+          {% else %}
+          <input class="form__input" type="text" id="answer-{{ q.id }}" name="answer_{{ q.id }}" maxlength="2000" value="{{ answers[q.id] }}">
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </section>
     {% endif %}
 
     <div class="form__actions">
@@ -101,29 +150,36 @@
   </form>
 
   {% if mode == "edit" %}
-  <div class="card__body">
-    <h2>Uploads</h2>
-    {% if uploads and uploads.length > 0 %}
-    <ul>
-      {% for u in uploads %}
-      <li><a href="/uploads/{{ u.id }}">{{ u.originalName }}</a> <span class="text-muted">({{ u.mime }}, {{ u.sizeBytes }} bytes)</span></li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="text-muted">No files uploaded.</p>
-    {% endif %}
-    <form class="form" method="post" action="/events/{{ eventId }}/projects/{{ project.id }}/uploads" enctype="multipart/form-data">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <div class="form__group">
-        <label class="form__label" for="file">Add file (png, jpg, gif, webp, pdf — max 10 MB)</label>
-        <input class="form__input" type="file" id="file" name="file" required>
+  <section class="p-section" aria-labelledby="p-uploads-h">
+    <div class="p-section__head">
+      <div>
+        <h2 class="p-section__title" id="p-uploads-h">Uploads</h2>
+        <p class="p-section__desc">Screenshots, decks, or demo PDFs — served as download links.</p>
       </div>
-      <div class="form__actions">
-        <button class="button button--secondary" type="submit">Upload</button>
-      </div>
-    </form>
-    <p class="mt-2"><a href="/events/{{ eventId }}/projects/{{ project.id }}/versions">Version history</a></p>
-  </div>
+    </div>
+    <div class="p-section__body">
+      {% if uploads and uploads.length > 0 %}
+      <ul class="p-upload-list">
+        {% for u in uploads %}
+        <li class="p-upload-list__item"><a href="/uploads/{{ u.id }}">{{ u.originalName }}</a> <span class="p-upload-list__meta">({{ u.mime }}, {{ u.sizeBytes }} bytes)</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted">No files uploaded.</p>
+      {% endif %}
+      <form class="form" method="post" action="/events/{{ eventId }}/projects/{{ project.id }}/uploads" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <div class="form__group">
+          <label class="form__label" for="file">Add file (png, jpg, gif, webp, pdf — max 10 MB)</label>
+          <input class="form__input" type="file" id="file" name="file" required>
+        </div>
+        <div class="form__actions">
+          <button class="button button--secondary" type="submit">Upload</button>
+        </div>
+      </form>
+      <p class="mt-2"><a href="/events/{{ eventId }}/projects/{{ project.id }}/versions">Version history</a></p>
+    </div>
+  </section>
   {% endif %}
   {% endif %}
 </div>

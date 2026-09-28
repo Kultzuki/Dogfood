@@ -1,0 +1,255 @@
+/* Judging clarity layer — HackerEarth-dense but scannable.
+   Presentational only. All competition numbers render server-side.
+   No external assets, fonts, or images. Inline SVG in templates only. */
+
+.j-page-intro {
+  max-width: 72ch;
+}
+
+.j-queue-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.j-queue-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.j-progress-track {
+  margin-top: 0.75rem;
+}
+
+.j-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.j-queue-grid {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.9rem;
+}
+
+.j-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.j-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.j-card__index {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.j-card__title {
+  font-size: 1.02rem;
+  line-height: 1.3;
+  margin: 0.35rem 0 0;
+  overflow-wrap: break-word;
+}
+
+.j-card__tagline {
+  margin: 0.3rem 0 0;
+  font-size: 0.88rem;
+}
+
+.j-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+}
+
+.j-card__foot {
+  margin-top: auto;
+  padding-top: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.j-deadline {
+  font-size: 0.8rem;
+}
+
+/* Ballot: two-pane brief + scoring */
+.j-ballot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.j-brief-list {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.j-brief-row {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.j-brief-term {
+  font-weight: 700;
+}
+
+.j-rubric-row {
+  border: 1px solid var(--border, #d8d8d8);
+  border-radius: 0.55rem;
+  padding: 0.7rem 0.75rem;
+  margin-bottom: 0.7rem;
+  background: var(--surface, #fff);
+}
+
+.j-rubric-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.j-weight-hint {
+  font-size: 0.8rem;
+}
+
+.j-score-input {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.45rem;
+}
+
+.j-score-input input {
+  max-width: 9rem;
+}
+
+.j-scale-note {
+  font-size: 0.8rem;
+}
+
+.j-total-sticky {
+  position: sticky;
+  bottom: 0.75rem;
+  border: 1px solid var(--border, #d8d8d8);
+  border-radius: 0.55rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--surface-raised, #f7f7f7);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.j-total-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stepper clarity: reuse .stepper__step--active/past from main.css */
+.j-stepper {
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+}
+
+.j-stepper__count {
+  font-size: 0.82rem;
+}
+
+/* Hub + dashboard */
+.j-stat-note {
+  font-size: 0.8rem;
+}
+
+.j-event-grid {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
+
+.j-checklist-meta {
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.j-table-note {
+  font-size: 0.82rem;
+}
+
+.j-guard-box {
+  border: 1px dashed var(--border, #c9c9c9);
+  border-radius: 0.55rem;
+  padding: 0.7rem 0.8rem;
+}
+
+.j-verify-grid {
+  display: grid;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+.j-cert-seal {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.j-empty-icon {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+}
+
+:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (max-width: 50rem) {
+  .j-ballot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .j-brief-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .j-total-sticky {
+    position: static;
+  }
+}

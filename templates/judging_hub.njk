@@ -1,11 +1,12 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <div class="card__header card__header--split">
     <div>
       <h1 class="card__title card__title--left mb-0">Judging Hub</h1>
-      <p class="text-muted">Oversee judging assignments, scoring rubrics, and evaluation progress across events.</p>
+      <p class="text-muted j-page-intro">Oversee judging assignments, scoring rubrics, and evaluation progress across events.</p>
     </div>
     {% if isOrganizer %}
     <a class="button button--secondary button--sm" href="/events">Manage Events</a>
@@ -16,6 +17,7 @@
     {% if isJudge and judgeAssignments and judgeAssignments.length > 0 %}
     <div class="hub-card hub-card--flush">
       <h2 class="text-lg mb-2">Your Assigned Events (Judge)</h2>
+      <p class="text-muted j-table-note">Open a queue to score your assigned projects. Only your own pending counts are shown.</p>
       <ul class="flex flex-col gap-2">
         {% for a in judgeAssignments %}
         <li class="flex justify-between items-center gap-2 table-row-bordered">
@@ -35,7 +37,7 @@
     <p class="section-desc">Track review coverage and score submissions across hackathons you manage.</p>
 
     {% if events and events.length > 0 %}
-    <div class="event-card-list">
+    <div class="event-card-list j-event-grid">
       {% for e in events %}
       <div class="event-card">
         <div class="event-card__header">

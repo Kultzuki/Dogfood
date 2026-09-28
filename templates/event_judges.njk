@@ -1,6 +1,7 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <!-- Breadcrumb -->
   <nav class="breadcrumb" aria-label="Breadcrumb">
@@ -14,7 +15,7 @@
   <div class="card__header card__header--split">
     <div>
       <h1 class="card__title card__title--left mb-0">Judge Management</h1>
-      <p class="text-muted">Invite judges, manage track scopes, and track evaluation workloads.</p>
+      <p class="text-muted j-page-intro">Invite judges, manage track scopes, and track evaluation workloads. Judges see only their own assignments — never peer scores.</p>
     </div>
     <a class="button button--secondary button--sm" href="/events/{{ event.id }}/judging-progress">View Judging Progress &rarr;</a>
   </div>
@@ -28,7 +29,7 @@
   <!-- Judges List -->
   <div class="card__body">
     <h2 class="text-xl mb-1">Event Judges ({{ judges.length }})</h2>
-    <p class="section-desc">Judges have access to score projects assigned to them or within their track scope.</p>
+    <p class="section-desc j-table-note">Judges have access to score projects assigned to them or within their track scope. Counts only — no ballot contents are visible here.</p>
 
     {% if judges and judges.length > 0 %}
     <div class="table-wrapper mb-6">

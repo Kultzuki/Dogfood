@@ -1,6 +1,7 @@
 {% extends "layout.njk" %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/judging.css">
 <div class="card page">
   <div class="card__header">
     <h1 class="card__title">Certificate of Record</h1>
@@ -8,10 +9,14 @@
   </div>
 
   <div class="card__body">
-    <p class="detail-meta">
-      <span class="badge badge--scored">{{ cert.type }}</span>
-      <span class="badge">key {{ cert.kid }}</span>
-    </p>
+    <div class="j-cert-seal">
+      <svg class="j-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+      <p class="detail-meta">
+        <span class="badge badge--scored">{{ cert.type }}</span>
+        <span class="badge">key {{ cert.kid }}</span>
+      </p>
+    </div>
+    <p class="text-muted j-table-note mt-2">Offline-verifiable record: digest and signature below can be checked without trusting this page.</p>
     <div class="table-wrapper mt-4">
       <table class="table">
         <tbody>
