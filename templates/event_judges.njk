@@ -1,0 +1,120 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a class="breadcrumb__link" href="/events">Events</a>
+    <span class="breadcrumb__separator">/</span>
+    <a class="breadcrumb__link" href="/events/{{ event.id }}/manage">{{ event.name }}</a>
+    <span class="breadcrumb__separator">/</span>
+    <span class="breadcrumb__current">Judges</span>
+  </nav>
+
+  <div class="card__header card__header--split">
+    <div>
+      <h1 class="card__title card__title--left mb-0">Judge Management</h1>
+      <p class="text-muted">Invite judges, manage track scopes, and track evaluation workloads.</p>
+    </div>
+    <a class="button button--secondary button--sm" href="/events/{{ event.id }}/judging-progress">View Judging Progress &rarr;</a>
+  </div>
+
+  {% if error %}
+  <div class="alert alert--error alert--inset" role="alert">
+    <strong>Error:</strong> {{ error }}
+  </div>
+  {% endif %}
+
+  <!-- Judges List -->
+  <div class="card__body">
+    <h2 class="text-xl mb-1">Event Judges ({{ judges.length }})</h2>
+    <p class="section-desc">Judges have access to score projects assigned to them or within their track scope.</p>
+
+    {% if judges and judges.length > 0 %}
+    <div class="table-wrapper mb-6">
+      <table class="table">
+        <thead class="table__head">
+          <tr class="table__row">
+            <th class="table__header-cell" scope="col">Judge</th>
+            <th class="table__header-cell" scope="col">Track Scope</th>
+            <th class="table__header-cell" scope="col">Assigned</th>
+            <th class="table__header-cell" scope="col">Completed</th>
+            <th class="table__header-cell" scope="col">Progress</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for j in judges %}
+          <tr class="table__row">
+            <td class="table__cell">
+              <strong>{{ j.name or j.email }}</strong>
+              {% if j.name and j.email %}<div class="text-muted text-xs">{{ j.email }}</div>{% endif %}
+            </td>
+            <td class="table__cell">
+              {% if j.track_name %}
+              <span class="badge badge--info">{{ j.track_name }}</span>
+              {% else %}
+              <span class="badge">All tracks</span>
+              {% endif %}
+            </td>
+            <td class="table__cell">{{ j.assigned_count }}</td>
+            <td class="table__cell">{{ j.done_count }}</td>
+            <td class="table__cell">
+              {% if j.assigned_count > 0 %}
+              <div class="flex items-center gap-2">
+                <progress class="progress-bar progress-bar--w80" value="{{ j.done_count }}" max="{{ j.assigned_count }}" aria-label="Progress for {{ j.name or j.email }}"></progress>
+                <span class="text-muted text-xs">{{ j.pct }}%</span>
+              </div>
+              {% else %}
+              <span class="text-muted text-xs">No assignments</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state mb-6">
+      <p class="empty-state__title">No judges invited yet.</p>
+      <p class="empty-state__text">Invite judges with judge accounts to evaluate projects during the judging period.</p>
+    </div>
+    {% endif %}
+
+    <!-- Invite Judge Form -->
+    <div class="hub-card">
+      <h3 class="text-base mb-3">Invite a Judge to this Event</h3>
+      <form class="form form--flush" method="post" action="/events/{{ event.id }}/judges">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        <div class="split-view">
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="judge-email">Judge Email or User ID</label>
+            <input class="form__input" type="text" id="judge-email" name="identifier" required autocomplete="off" placeholder="judge@example.org or UUID">
+            <span class="form__help">The user must have a registered judge account.</span>
+          </div>
+
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="judge-track">Track Scope (Optional)</label>
+            <select class="form__input" id="judge-track" name="trackId">
+              <option value="">All tracks (Unscoped)</option>
+              {% for t in tracks %}
+              <option value="{{ t.id }}">{{ t.name }}</option>
+              {% endfor %}
+            </select>
+            <span class="form__help">Restricts judge assignments and visibility to this track.</span>
+          </div>
+        </div>
+
+        <div class="form__actions form__actions--start mt-3">
+          <button class="button button--primary button--sm" type="submit">Invite Judge</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="mt-6 flex justify-between items-center">
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/manage">&larr; Back to Manage Event</a>
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/data">Import Assignments via Data Hub (CSV) &rarr;</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

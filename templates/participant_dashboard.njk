@@ -7,9 +7,7 @@
     <p class="text-muted text-center">{{ eventName }}</p>
   </div>
 
-  {% if flash %}
-  <div class="alert alert--{{ flash.kind }}" role="alert">{{ flash.message }}</div>
-  {% endif %}
+
 
   <div class="card__body">
     <h2>My Team</h2>
@@ -17,7 +15,9 @@
     <p><strong>{{ team.name }}</strong> <span class="text-muted">({{ team.memberCount }} members)</span></p>
     <p><a href="/events/{{ eventId }}/my-team">View team &amp; invite link</a></p>
     {% else %}
-    <p class="text-muted">You are not on a team yet. Ask an organizer for a team invite link.</p>
+    <p class="text-muted">You are not on a team yet.</p>
+    <p class="mt-2"><a class="button button--primary" href="/events/{{ eventId }}/teams/new">Create a team</a></p>
+    <p class="text-muted mt-2">…or ask a teammate for their team invite link to join.</p>
     {% endif %}
   </div>
 

@@ -41,14 +41,52 @@ export function setFlash(
 /**
  * Take and clear the pending flash message, or null when absent/invalid.
  * Invalid shapes are discarded so a corrupt session value never renders.
+ * Cached on the request object so multiple calls on the same request return
+ * the consumed message rather than null, while still removing it from session
+ * so subsequent HTTP requests will never see it.
  */
 export function consumeFlash(req: FastifyRequest): FlashMessage | null {
-  const raw = req.session[FLASH_KEY] as Record<string, unknown> | undefined;
-  delete req.session[FLASH_KEY];
+  const reqAny = req as unknown as { _consumedFlash?: FlashMessage | null };
+  if (reqAny && reqAny._consumedFlash !== undefined) {
+    return reqAny._consumedFlash;
+  }
+
+  const raw = req.session ? (req.session[FLASH_KEY] as Record<string, unknown> | undefined) : undefined;
+  if (req.session && FLASH_KEY in req.session) {
+    delete req.session[FLASH_KEY];
+  }
+
+  if (typeof raw !== "object" || raw === null) {
+    if (reqAny) reqAny._consumedFlash = null;
+    return null;
+  }
+  const kind: unknown = raw["kind"];
+  const message: unknown = raw["message"];
+  if (!isFlashKind(kind)) {
+    if (reqAny) reqAny._consumedFlash = null;
+    return null;
+  }
+  if (typeof message !== "string" || message.length === 0) {
+    if (reqAny) reqAny._consumedFlash = null;
+    return null;
+  }
+  const result: FlashMessage = { kind, message };
+  if (reqAny) reqAny._consumedFlash = result;
+  return result;
+}
+
+/**
+ * Inspect the flash message on the current request without mutating session.
+ */
+export function getFlash(req: FastifyRequest): FlashMessage | null {
+  const reqAny = req as unknown as { _consumedFlash?: FlashMessage | null };
+  if (reqAny && reqAny._consumedFlash !== undefined) {
+    return reqAny._consumedFlash;
+  }
+  const raw = req.session ? (req.session[FLASH_KEY] as Record<string, unknown> | undefined) : undefined;
   if (typeof raw !== "object" || raw === null) return null;
   const kind: unknown = raw["kind"];
   const message: unknown = raw["message"];
-  if (!isFlashKind(kind)) return null;
-  if (typeof message !== "string" || message.length === 0) return null;
+  if (!isFlashKind(kind) || typeof message !== "string" || message.length === 0) return null;
   return { kind, message };
 }

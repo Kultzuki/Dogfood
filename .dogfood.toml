@@ -1,5 +1,11 @@
 # .dogfood.toml — acceptance checker config (see stuff/spec.md).
-# Run: py -3 stuff/run.py .dogfood.toml > acceptance-report.txt
+# Run (sandbox-reproducible):
+#   SESSION_SECRET=dogfood-local-demo-session-secret-0000000000 DOGFOOD_DEMO_ACCOUNTS=0 docker compose up --build -d
+#   py -3 stuff/run.py .dogfood.toml --fixtures stuff/fixtures.json > acceptance-report.txt
+# The deterministic SESSION_SECRET above is a throwaway sandbox-only opt-in
+# so these cookies verify across `down -v` resets; never use it outside a
+# local sandbox. With a normal boot (no SESSION_SECRET), re-copy the
+# `Cookie: sid=...` lines the container prints at boot.
 #
 # Reproducibility contract for the [auth] block below: these cookies are
 # HMAC-signed with the SESSION_SECRET pinned in compose.yaml, so they stay
@@ -15,10 +21,10 @@ claimed = ["T1", "T2"]
 pitch = "Self-hostable hackathon submission and judging platform with backend-enforced role isolation."
 
 [auth]
-organizer = "Cookie: sid=fixture-organizer.3bMttyxdYJnzqH6o5Wqy_JD-SM7a0jYzmMWhDu3iDDs"
-judge_a = "Cookie: sid=fixture-judge-a.9M4Nnki-sim_yMHeIGYyhZaPos5TMdtQc0dtYG6j1tM"
-judge_b = "Cookie: sid=fixture-judge-b.RcaMP-m88FWaagNhrwMrlL9Ox9ZYrFEv0AufMcn4Nlk"
-participant = "Cookie: sid=fixture-participant.ZtPoPlsb3A_xKRtsmBwdcYwgnUM9F69uzJPwwCiifss"
+organizer = "Cookie: sid=fixture-organizer.8Q-odhJpG_6OcIwk6or3KVJOvO61ckyML8nMO7ncBXY"
+judge_a = "Cookie: sid=fixture-judge-a.NyByZmSl_R3OaC0ixjmsXccqDOzqeXgzYuldFLTqS2o"
+judge_b = "Cookie: sid=fixture-judge-b.QzQuhWBrwPXVhlzsuoIrcZjkEw37mGsb8kFaHfBC_hg"
+participant = "Cookie: sid=fixture-participant.zttHoYNcpjFF9ydPajLFCwrJpI_RCWPY6dMYSj9ITow"
 
 [routes]
 gallery = "/gallery"

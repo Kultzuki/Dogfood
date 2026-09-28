@@ -117,9 +117,9 @@ export default async function projectRoutes(app: FastifyInstance): Promise<void>
       const t = await pool.query("SELECT 1 FROM tracks WHERE id = $1 AND event_id = $2", [f.trackId, eventId]);
       if ((t.rowCount ?? 0) === 0) return reply.code(422).send({ error: "invalid_track" });
     }
-    // DB-clock deadline gate (mirrors edit/submit): NULL submissions_close_at = open.
+    // DB-clock deadline gate (mirrors edit/submit): NULL bounds = open.
     {
-      const dl = await pool.query("SELECT COALESCE(now() <= submissions_close_at, true) AS open FROM events WHERE id = $1", [eventId]);
+      const dl = await pool.query("SELECT ((submissions_open_at IS NULL OR now() >= submissions_open_at) AND (submissions_close_at IS NULL OR now() <= submissions_close_at)) AS open FROM events WHERE id = $1", [eventId]);
       if ((dl.rowCount ?? 0) === 0) return reply.code(404).send({ error: "not_found" });
       if (!(dl.rows[0] as { open: boolean }).open) return reply.code(422).send({ error: "deadline_passed" });
     }
@@ -156,7 +156,7 @@ export default async function projectRoutes(app: FastifyInstance): Promise<void>
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const cur = await client.query("SELECT p.*, (SELECT now() > e.submissions_close_at FROM events e WHERE e.id = p.event_id) AS past_due FROM projects p WHERE p.id = $1 AND p.event_id = $2 FOR UPDATE", [projectId, eventId]);
+      const cur = await client.query("SELECT p.*, ((SELECT e.submissions_open_at IS NOT NULL AND now() < e.submissions_open_at FROM events e WHERE e.id = p.event_id) OR (SELECT e.submissions_close_at IS NOT NULL AND now() > e.submissions_close_at FROM events e WHERE e.id = p.event_id)) AS past_due FROM projects p WHERE p.id = $1 AND p.event_id = $2 FOR UPDATE", [projectId, eventId]);
       const row = cur.rows[0] as (ProjectRow & { past_due: boolean | null }) | undefined;
       if (!row) { await safeRollback(client); return reply.code(404).send({ error: "not_found" }); }
       if (!(await isTeamMember(row.team_id, userId))) { await safeRollback(client); return reply.code(404).send({ error: "not_found" }); }
@@ -196,10 +196,10 @@ export default async function projectRoutes(app: FastifyInstance): Promise<void>
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const up = await client.query("UPDATE projects SET status = 'submitted', updated_at = now() WHERE id = $1 AND status = 'draft' AND (SELECT COALESCE(now() <= submissions_close_at, true) FROM events WHERE id = $2) RETURNING *", [projectId, eventId]);
+      const up = await client.query("UPDATE projects SET status = 'submitted', updated_at = now() WHERE id = $1 AND status = 'draft' AND (SELECT ((e.submissions_open_at IS NULL OR now() >= e.submissions_open_at) AND (e.submissions_close_at IS NULL OR now() <= e.submissions_close_at)) FROM events e WHERE e.id = $2) RETURNING *", [projectId, eventId]);
       const done = up.rows[0] as ProjectRow | undefined;
       if (!done) {
-        const again = await client.query("SELECT status, (SELECT now() > e.submissions_close_at FROM events e WHERE e.id = $2) AS past_due FROM projects WHERE id = $1", [projectId, eventId]);
+        const again = await client.query("SELECT status, ((SELECT e.submissions_open_at IS NOT NULL AND now() < e.submissions_open_at FROM events e WHERE e.id = $2) OR (SELECT e.submissions_close_at IS NOT NULL AND now() > e.submissions_close_at FROM events e WHERE e.id = $2)) AS past_due FROM projects WHERE id = $1", [projectId, eventId]);
         const cur2 = again.rows[0] as { status: string; past_due: boolean | null } | undefined;
         await safeRollback(client);
         if (!cur2) return reply.code(404).send({ error: "not_found" });

@@ -13,12 +13,20 @@ Open-source, self-hostable hackathon submission and judging platform.
 docker compose up --build
 ```
 
-The platform starts on `http://localhost:3000`.
+The platform starts on `http://localhost:3000`. On first boot with
+`SESSION_SECRET` unset, a random secret is generated and persisted to the
+`appdata` volume (reused on restart).
 
-## Demo test accounts — LOCAL SANDBOX ONLY ⚠️
+## Demo test accounts — OPT-IN, LOCAL SANDBOX ONLY ⚠️
 
-`docker compose up` seeds four fixed, password-loginable identities so a
-human can drive the browser UI without hand-crafting signed session cookies:
+Disabled by default (`DOGFOOD_DEMO_ACCOUNTS=0`). Enable explicitly for
+local browser QA or the demo-video recording:
+
+```sh
+DOGFOOD_DEMO_ACCOUNTS=1 docker compose up --build
+```
+
+When enabled, four fixed password-loginable identities exist:
 
 | Role       | Email                        | Password          |
 | ---------- | ---------------------------- | ----------------- |
@@ -30,32 +38,26 @@ human can drive the browser UI without hand-crafting signed session cookies:
 Sign in normally at `http://localhost:3000`. One role per account, so
 cross-role isolation tests are meaningful.
 
-**These are demo credentials for a local sandbox only.** They share one
-published password and are seeded by `src/db/seed-demo.ts` behind
-`DOGFOOD_DEMO_ACCOUNTS=1` (any other value is a silent no-op). They are
-created through the same `users` table and scrypt hash that `POST /register`
-uses — there is no backdoor route, no pre-minted session token, and no
-CSRF/authorization bypass.
-
-**Disable them for any deployment that is not a local sandbox.** Add to a
-`.env` file beside `compose.yaml` (or export in your shell):
-
-```sh
-DOGFOOD_DEMO_ACCOUNTS=0
-```
+**They are disabled unless you opt in.** The default (`0` or unset) is a
+silent no-op. They are created through the same `users` table and scrypt
+hash that `POST /register` uses — there is no backdoor route, no
+pre-minted session token, and no CSRF/authorization bypass. Never enable
+them outside a throwaway local sandbox.
 
 The demo accounts are unrelated to the official acceptance fixture
 identities in `stuff/fixtures.json`, and `.dogfood.toml` never references
 them.
 
-> **Also pin `SESSION_SECRET` for real deployments.** `compose.yaml` ships a
-> deterministic local-sandbox value so the committed `.dogfood.toml`
-> acceptance cookies keep working across `docker compose down -v` resets.
-> With that default in place, anyone who can read this repository could
-> forge a session cookie for the public fixture tokens. Generate your own
+> **Session secret.** No deterministic secret is shipped. On first boot
+> with `SESSION_SECRET` unset, the entrypoint generates a random secret
+> and persists it to the `appdata` volume (`0600`, reused on restart).
+> For a real deployment, always supply your own:
 > (`SESSION_SECRET=$(openssl rand -hex 32) docker compose up -d`) and
 > refresh the `[auth]` block in `.dogfood.toml` from the `Cookie: sid=...`
-> lines the container prints at boot.
+> lines the container prints at boot. A deterministic sandbox value is
+> available ONLY as an explicit opt-in for checker reproducibility
+> (`SESSION_SECRET=dogfood-local-demo-session-secret-0000000000 ...`) —
+> never use it outside a throwaway sandbox.
 
 ## Verify
 
@@ -89,14 +91,19 @@ The official checker (`stuff/run.py`, read-only) verifies tier completion
 against the live deployment:
 
 ```sh
-docker compose up --build -d
-py -3 stuff/run.py .dogfood.toml > acceptance-report.txt
+SESSION_SECRET=dogfood-local-demo-session-secret-0000000000 DOGFOOD_DEMO_ACCOUNTS=0 docker compose up --build -d
+py -3 stuff/run.py .dogfood.toml --fixtures stuff/fixtures.json > acceptance-report.txt
 ```
 
 `.dogfood.toml` holds the base URL, the honest tier claim, the seed's
 printed `Cookie: sid=...` auth headers, and the route map (`/gallery`,
 `/projects/new`, `/api/judge/scores`, `/api/export.csv`). The committed
-`acceptance-report.txt` is the verbatim output of that run.
+`acceptance-report.txt` is the verbatim output of that run. The
+deterministic `SESSION_SECRET` value above is a throwaway sandbox-only
+opt-in so the committed cookies reproduce across `down -v` resets — never
+use it outside a local sandbox. With a normal boot (no `SESSION_SECRET`),
+copy the fresh `Cookie: sid=...` lines from the boot log into
+`.dogfood.toml` before running the checker.
 
 Current verdict: claimed `T1 T2`, verified `T1 T2` (7/7 checks pass).
 T3 community voting + comments are implemented (authenticated one-vote-per-project
@@ -133,8 +140,11 @@ default 12). `GET /gallery/embed` is the only route that permits framing
 ## Tests
 
 There is no top-level `tests/` directory. The suite lives colocated with
-the code as `src/**/*.test.ts` (10 files: `authz/isolation`,
-`judging/engine`, `lib/audit`, `lib/csv`, `lib/eventTransitions`,
-`lib/password`, `lib/rateLimit`, `lib/uploadStore`, `routes/rubrics`,
-`routes/community`).
+the code as `src/**/*.test.ts` (18 files: `authz/isolation`,
+`judging/engine`, `lib/audit`, `lib/csv`, `lib/csvDatasets`,
+`lib/eventTransitions`, `lib/password`, `lib/rateLimit`, `lib/signing`,
+`lib/uploadStore`, `lib/webhooks`, `routes/rubrics`, `routes/community`,
+`routes/event-dates`, `routes/scores-criteria`, `routes/scores-bypass`,
+`routes/teams-flow`, `routes/teams-join`, `routes/finalize`, plus route
+regression suites).
 Run it with `npm test` (`vitest run`).

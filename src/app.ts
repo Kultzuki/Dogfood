@@ -28,6 +28,7 @@ import webhookRoutes from "./routes/webhooks.js";
 import certificateRoutes from "./routes/certificates.js";
 import apiIndexRoutes from "./routes/api.js";
 import acceptanceRoutes from "./routes/acceptance.js";
+import finalizeRoutes from "./routes/finalize.js";
 import { registerShellPages } from "./routes/pages/shell.js";
 import { registerParticipantPages } from "./routes/pages/participant.js";
 import { registerJudgePages } from "./routes/pages/judge.js";
@@ -101,6 +102,7 @@ export async function buildApp(opts: AppOptions = {}) {
   await app.register(certificateRoutes);
   await app.register(apiIndexRoutes);
   await app.register(acceptanceRoutes);
+  await app.register(finalizeRoutes);
 
   // ── 8. Server-rendered UI pages ───────────────────────────────────
   await app.register(registerShellPages);

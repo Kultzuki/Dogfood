@@ -1,0 +1,86 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a class="breadcrumb__link" href="/events">Events</a>
+    <span class="breadcrumb__separator">/</span>
+    <a class="breadcrumb__link" href="/events/{{ event.id }}/manage">{{ event.name }}</a>
+    <span class="breadcrumb__separator">/</span>
+    <span class="breadcrumb__current">Scoring Rubric</span>
+  </nav>
+
+  <div class="card__header card__header--left">
+    <h1 class="card__title card__title--left">Scoring Rubric Configuration</h1>
+    <p class="text-muted">Configure the 4 weighted judging criteria. Weights must sum to exactly 100%.</p>
+  </div>
+
+  {% if error %}
+  <div class="alert alert--error alert--inset" role="alert">
+    <strong>Error:</strong> {{ error }}
+  </div>
+  {% endif %}
+
+  <div class="card__body">
+    <!-- Active Version Banner -->
+    <div class="hub-card hub-card--flush">
+      <div class="flex justify-between items-center mb-1">
+        <strong>Active Rubric Version: v{{ activeRubric.version }}</strong>
+        <span class="badge badge--success">Active</span>
+      </div>
+      <p class="text-muted text-xs mb-0">
+        Judges score each project on a 0–100 scale per criterion. The platform computes the weighted composite server-side. Updating weights creates a new version; previously submitted scores remain immutable and preserve their original rubric version.
+      </p>
+    </div>
+
+    <!-- Edit Form -->
+    <form class="form form--flush" method="post" action="/events/{{ event.id }}/rubric">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+      <div class="form__group">
+        <label class="form__label" for="technical">
+          <strong>Technical Execution (Weight %)</strong>
+          <span class="text-muted block text-xs font-normal">Code quality, software architecture, technical difficulty, complexity, and working functionality.</span>
+        </label>
+        <input class="form__input" type="number" id="technical" name="technical" min="0" max="100" step="1" required value="{{ activeRubric.weights.technical }}" data-criteria="rubric-total">
+      </div>
+
+      <div class="form__group">
+        <label class="form__label" for="innovation">
+          <strong>Innovation &amp; Creativity (Weight %)</strong>
+          <span class="text-muted block text-xs font-normal">Originality of the idea, novel application of technology, creative problem solving.</span>
+        </label>
+        <input class="form__input" type="number" id="innovation" name="innovation" min="0" max="100" step="1" required value="{{ activeRubric.weights.innovation }}" data-criteria="rubric-total">
+      </div>
+
+      <div class="form__group">
+        <label class="form__label" for="impact">
+          <strong>Impact &amp; Real-World Value (Weight %)</strong>
+          <span class="text-muted block text-xs font-normal">Practical usefulness, potential market or societal impact, solution viability.</span>
+        </label>
+        <input class="form__input" type="number" id="impact" name="impact" min="0" max="100" step="1" required value="{{ activeRubric.weights.impact }}" data-criteria="rubric-total">
+      </div>
+
+      <div class="form__group">
+        <label class="form__label" for="polish">
+          <strong>Polish &amp; Design (Weight %)</strong>
+          <span class="text-muted block text-xs font-normal">User experience, visual design, demo quality, documentation, presentation.</span>
+        </label>
+        <input class="form__input" type="number" id="polish" name="polish" min="0" max="100" step="1" required value="{{ activeRubric.weights.polish }}" data-criteria="rubric-total">
+      </div>
+
+      <!-- Live Total Indicator -->
+      <div class="rubric-total-box">
+        <span class="font-semibold text-sm">Total Weight:</span>
+        <span class="font-bold text-base"><span data-output="rubric-total">100</span>% / 100%</span>
+      </div>
+
+      <div class="form__actions mt-6">
+        <button class="button button--primary" type="submit">Save Rubric as Version v{{ activeRubric.version + 1 }}</button>
+        <a class="button button--secondary" href="/events/{{ event.id }}/manage">Back to Manage Event</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

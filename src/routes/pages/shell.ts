@@ -43,6 +43,8 @@ declare module "fastify" {
 export interface CurrentUser {
   id: string;
   role: string;
+  name?: string;
+  email?: string;
 }
 
 export interface ShellLocals {
@@ -138,12 +140,12 @@ export const registerShellPages = fp(async function registerShellPages(
     const userId = req.session.userId;
     if (typeof userId === "string" && userId.length > 0) {
       try {
-        const { rows } = await pool.query<{ id: string; role: string }>(
-          `SELECT id, role FROM users WHERE id = $1`,
+        const { rows } = await pool.query<{ id: string; role: string; name: string; email: string }>(
+          `SELECT id, role, name, email FROM users WHERE id = $1`,
           [userId],
         );
         const row = rows[0];
-        if (row) currentUser = { id: row.id, role: row.role };
+        if (row) currentUser = { id: row.id, role: row.role, name: row.name, email: row.email };
       } catch {
         currentUser = null;
       }

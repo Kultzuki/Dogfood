@@ -1,0 +1,102 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header card__header--split">
+    <div>
+      <h1 class="card__title card__title--left">My Events</h1>
+      <p class="text-muted">Manage your hackathons, configure tracks and prizes, and oversee judging and results.</p>
+    </div>
+    <a class="button button--primary" href="/events/new">+ Create Event</a>
+  </div>
+
+  <div class="card__body">
+    {% if events and events.length > 0 %}
+    <div class="event-card-list">
+      {% for e in events %}
+      <div class="event-card">
+        <div class="event-card__header">
+          <div>
+            <h2 class="text-xl mb-1">
+              <a class="event-card__title" href="/events/{{ e.id }}/manage">{{ e.name }}</a>
+            </h2>
+            <div class="flex items-center gap-2 flex-wrap">
+              {% if e.state == "DRAFT" %}
+              <span class="badge badge--draft">{{ e.state }}</span>
+              {% elif e.state == "REGISTRATION_OPEN" %}
+              <span class="badge badge--pending">{{ e.state }}</span>
+              {% elif e.state == "SUBMISSIONS_OPEN" %}
+              <span class="badge badge--submitted">{{ e.state }}</span>
+              {% elif e.state == "SUBMISSIONS_CLOSED" %}
+              <span class="badge badge--warning">{{ e.state }}</span>
+              {% elif e.state == "JUDGING" %}
+              <span class="badge badge--scored">{{ e.state }}</span>
+              {% elif e.state == "RESULTS_FINAL" or e.state == "PUBLISHED" %}
+              <span class="badge badge--success">{{ e.state }}</span>
+              {% else %}
+              <span class="badge">{{ e.state }}</span>
+              {% endif %}
+              <span class="text-muted text-xs">Version {{ e.version }}</span>
+              {% if e.updated_at %}
+              <span class="text-muted text-xs">· Updated {{ e.updated_at_formatted }}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="event-card__actions">
+            <a class="button button--primary button--sm" href="/events/{{ e.id }}/manage">Manage Event &rarr;</a>
+          </div>
+        </div>
+
+        {% if e.description %}
+        <p class="event-card__desc">{{ e.description }}</p>
+        {% endif %}
+
+        <div class="event-card__metrics">
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.team_count }}</span>
+            <span class="event-card__metric-lbl">Teams</span>
+          </div>
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.project_count }}</span>
+            <span class="event-card__metric-lbl">Projects ({{ e.submitted_project_count }} submitted)</span>
+          </div>
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.judge_count }}</span>
+            <span class="event-card__metric-lbl">Judges</span>
+          </div>
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.score_count }}</span>
+            <span class="event-card__metric-lbl">Scores</span>
+          </div>
+        </div>
+
+        <div class="event-card__footer">
+          <div class="event-card__dates">
+            {% if e.submissions_close_formatted %}
+            <span><strong>Deadline:</strong> {{ e.submissions_close_formatted }}</span>
+            {% elif e.dates_summary %}
+            <span>{{ e.dates_summary }}</span>
+            {% else %}
+            <span>Schedule dates not set</span>
+            {% endif %}
+          </div>
+          <div class="flex gap-2">
+            <a class="button button--secondary button--sm" href="/events/{{ e.id }}/judging-progress">Judging Progress</a>
+            {% if e.state == "PUBLISHED" or e.state == "SUBMISSIONS_CLOSED" or e.state == "JUDGING" or e.state == "RESULTS_FINAL" %}
+            <a class="button button--secondary button--sm" href="/gallery">Gallery</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state__title">No events yet.</p>
+      <p class="empty-state__text">Create your first hackathon event to get started. You'll be guided through setting up tracks, prizes, teams, and judging.</p>
+      <a class="button button--primary" href="/events/new">Create Event</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

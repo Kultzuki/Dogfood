@@ -7,23 +7,9 @@
     <p class="text-muted text-center">{{ scored }} of {{ total }} ({{ pct }}%)</p>
     <p class="text-muted text-center">Track scope: {{ scopeLabel }}</p>
   </div>
-
-  {% if flash and flash.ok %}
-  <div class="alert alert--success" role="alert">
-    {{ flash.ok }}
-  </div>
-  {% endif %}
-  {% if flash and flash.err %}
-  <div class="alert alert--error" role="alert">
-    {{ flash.err }}
-  </div>
-  {% endif %}
-
   <div class="card__body">
     {% if items and items.length > 0 %}
-    <div class="progress-bar" role="progressbar" aria-valuenow="{{ scored }}" aria-valuemin="0" aria-valuemax="{{ total }}" aria-label="Judging progress">
-      <span class="progress-bar__fill" style="width: {{ pct }}%;"></span>
-    </div>
+    <progress class="progress-bar" value="{{ scored }}" max="{{ total }}" aria-label="Judging progress"></progress>
     <ul class="gallery-grid mt-4">
       {% for it in items %}
       <li class="card card--page project-card">

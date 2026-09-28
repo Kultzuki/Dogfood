@@ -5,7 +5,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { PoolClient } from "pg";
 import { pool } from "../db/index.js";
-import { fetchActiveRubric } from "./rubrics.js";
+import { fetchActiveRubric, compositeFor, RUBRIC_KEYS } from "./rubrics.js";
 import { requireAuth, requireEventRole, requireAssignment, requireTrackScope } from "../authz/guards.js";
 import { appendAuditForRequest, type PoolLike } from "../lib/audit.js";
 import { fanoutWebhooks } from "../lib/webhooks.js";
@@ -46,7 +46,7 @@ export function parseJudgeInviteBody(body: Record<string, unknown>): { input?: J
   return { error: "missing_judge" };
 }
 interface AssignmentRow { id: string; event_id: string; project_id: string; judge_user_id: string; track_id: string | null; status: string }
-interface ScoreRow { id: string; assignment_id: string; event_id: string; project_id: string; judge_user_id: string; value: string | number; version: number; supersedes_id: string | null; is_current: boolean; rubric_version: number | null }
+interface ScoreRow { id: string; assignment_id: string; event_id: string; project_id: string; judge_user_id: string; value: string | number; version: number; supersedes_id: string | null; is_current: boolean; rubric_version: number | null; criteria: unknown }
 interface Ctx { a: AssignmentRow; projectTrack: string | null }
 type Role = "participant" | "judge" | "organizer";
 
@@ -69,9 +69,20 @@ function getUserId(req: FastifyRequest): string | undefined {
 }
 const pick = (v: unknown): string | undefined => (typeof v === "string" && v.length > 0 ? v : undefined);
 const bodyOf = (req: FastifyRequest): Record<string, unknown> => (req.body ?? {}) as Record<string, unknown>;
-function parseValue(v: unknown): number | undefined {
+export function parseValue(v: unknown): number | undefined {
   const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
   return Number.isFinite(n) && n >= 0 && n <= 100 ? n : undefined;
+}
+export function parseCriteria(v: unknown): Record<string, number> | undefined {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return undefined;
+  const rec = v as Record<string, unknown>;
+  const out: Record<string, number> = {};
+  for (const k of RUBRIC_KEYS) {
+    const n = rec[k];
+    if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > 100) return undefined;
+    out[k] = n;
+  }
+  return out;
 }
 const outScore = (r: ScoreRow): Record<string, unknown> => ({ ...r, value: Number(r.value) });
 /** requireEventRole with an eventId known only after a DB lookup. True = blocked. */
@@ -200,9 +211,19 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
     if (!userId) return reply.code(401).send({ error: "unauthenticated" });
     const b = bodyOf(req);
     const assignmentId = pick(b.assignment_id ?? b.assignmentId);
-    const value = parseValue(b.value ?? b.score);
     if (!assignmentId || !UUID_RE.test(assignmentId)) return reply.code(422).send({ error: "malformed_assignment_id" });
-    if (value === undefined) return reply.code(422).send({ error: "invalid_score" });
+    const hasScalar = b.value !== undefined || b.score !== undefined;
+    const criteriaRaw = b.criteria ?? b.marks;
+    if (criteriaRaw === undefined) {
+      return reply.code(422).send({ error: "invalid_criteria" });
+    }
+    const criteria = parseCriteria(criteriaRaw);
+    if (criteria === undefined) {
+      return reply.code(422).send({ error: "invalid_criteria" });
+    }
+    if (hasScalar) {
+      return reply.code(422).send({ error: "conflicting_input" });
+    }
     const ctx = await loadCtx(assignmentId);
     if (!ctx) return reply.code(404).send({ error: "not_found" });
     if (await denyUnless(req, reply, ctx.a.event_id, "participant", "judge", "organizer")) return;
@@ -218,7 +239,16 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
       if (!la || la.judge_user_id !== userId || la.status !== "active") { await safeRollback(client); return reply.code(404).send({ error: "not_found" }); }
       if ((((await client.query(`SELECT 1 FROM scores WHERE assignment_id = $1 AND is_current = true LIMIT 1`, [assignmentId])).rowCount) ?? 0) > 0) { await safeRollback(client); return reply.code(409).send({ error: "already_scored" }); }
       const rubric = await fetchActiveRubric(ctx.a.event_id);
-      const row = (await client.query<ScoreRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, rubric_version) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, [assignmentId, la.event_id, la.project_id, userId, value, rubric.version])).rows[0];
+      const value = compositeFor(rubric.weights, criteria as Record<"technical" | "innovation" | "impact" | "polish", number>);
+      const criteriaJson = JSON.stringify(criteria);
+      let row: ScoreRow | undefined;
+      try {
+        row = (await client.query<ScoreRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, rubric_version, criteria) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) RETURNING *`, [assignmentId, la.event_id, la.project_id, userId, value, rubric.version, criteriaJson])).rows[0];
+      } catch (e) {
+        if (pgCode(e) === "42703") {
+          row = (await client.query<ScoreRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, rubric_version) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, [assignmentId, la.event_id, la.project_id, userId, value, rubric.version])).rows[0];
+        } else throw e;
+      }
       await client.query("COMMIT");
       if (!row) return reply.code(500).send({ error: "create_failed" });
       await emit(req, { eventId: row.event_id, action: "score.submit", resourceType: "score", resourceId: row.id, detail: { assignmentId, value } });
@@ -232,8 +262,18 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     if (!id || !UUID_RE.test(id)) return reply.code(422).send({ error: "malformed_score_id" });
     const b = bodyOf(req);
-    const value = parseValue(b.value ?? b.score);
-    if (value === undefined) return reply.code(422).send({ error: "invalid_score" });
+    const hasScalar = b.value !== undefined || b.score !== undefined;
+    const criteriaRaw = b.criteria ?? b.marks;
+    if (criteriaRaw === undefined) {
+      return reply.code(422).send({ error: "invalid_criteria" });
+    }
+    const criteria = parseCriteria(criteriaRaw);
+    if (criteria === undefined) {
+      return reply.code(422).send({ error: "invalid_criteria" });
+    }
+    if (hasScalar) {
+      return reply.code(422).send({ error: "conflicting_input" });
+    }
     const old = (await pool.query<ScoreRow>(`SELECT * FROM scores WHERE id = $1`, [id])).rows[0];
     if (!old) return reply.code(404).send({ error: "not_found" });
     const ctx = await loadCtx(old.assignment_id);
@@ -254,7 +294,16 @@ export default async function scoreRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(!lc || !lc.is_current ? 409 : 404).send({ error: !lc || !lc.is_current ? "superseded" : "not_found" });
       }
       const rubric = await fetchActiveRubric(ctx.a.event_id);
-      const row = (await client.query<ScoreRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, version, supersedes_id, rubric_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`, [la.id, la.event_id, la.project_id, userId, value, lc.version + 1, lc.id, rubric.version])).rows[0];
+      const value = compositeFor(rubric.weights, criteria as Record<"technical" | "innovation" | "impact" | "polish", number>);
+      const criteriaJson = JSON.stringify(criteria);
+      let row: ScoreRow | undefined;
+      try {
+        row = (await client.query<ScoreRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, version, supersedes_id, rubric_version, criteria) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb) RETURNING *`, [la.id, la.event_id, la.project_id, userId, value, lc.version + 1, lc.id, rubric.version, criteriaJson])).rows[0];
+      } catch (e) {
+        if (pgCode(e) === "42703") {
+          row = (await client.query<ScoreRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, version, supersedes_id, rubric_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`, [la.id, la.event_id, la.project_id, userId, value, lc.version + 1, lc.id, rubric.version])).rows[0];
+        } else throw e;
+      }
       await client.query(`UPDATE scores SET is_current = false WHERE id = $1`, [lc.id]);
       await client.query("COMMIT");
       if (!row) return reply.code(500).send({ error: "create_failed" });

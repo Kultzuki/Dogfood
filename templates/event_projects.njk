@@ -1,0 +1,105 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a class="breadcrumb__link" href="/events">Events</a>
+    <span class="breadcrumb__separator">/</span>
+    <a class="breadcrumb__link" href="/events/{{ event.id }}/manage">{{ event.name }}</a>
+    <span class="breadcrumb__separator">/</span>
+    <span class="breadcrumb__current">Projects</span>
+  </nav>
+
+  <div class="card__header card__header--split">
+    <div>
+      <h1 class="card__title card__title--left mb-0">Projects &amp; Submissions</h1>
+      <p class="text-muted">Review submitted projects and active drafts across tracks for {{ event.name }}.</p>
+    </div>
+    <div class="flex gap-2">
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/manage">&larr; Back to Manage Event</a>
+      <a class="button button--secondary button--sm" href="/gallery">Public Gallery</a>
+    </div>
+  </div>
+
+  <div class="card__body">
+    <!-- Stat bar -->
+    <div class="stat-grid mb-6">
+      <div class="stat-card">
+        <div class="stat-card__value">{{ projects.length }}</div>
+        <div class="stat-card__label">Total Projects</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ submittedCount }}</div>
+        <div class="stat-card__label">Submitted (Locked)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ draftCount }}</div>
+        <div class="stat-card__label">In Draft</div>
+      </div>
+    </div>
+
+    {% if projects and projects.length > 0 %}
+    <div class="table-wrapper">
+      <table class="table">
+        <thead class="table__head">
+          <tr class="table__row">
+            <th class="table__header-cell" scope="col">Project</th>
+            <th class="table__header-cell" scope="col">Status</th>
+            <th class="table__header-cell" scope="col">Track</th>
+            <th class="table__header-cell" scope="col">Team</th>
+            <th class="table__header-cell" scope="col">Tech Tags</th>
+            <th class="table__header-cell" scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in projects %}
+          <tr class="table__row">
+            <td class="table__cell">
+              <strong>{{ p.title }}</strong>
+              {% if p.tagline %}
+              <div class="text-muted text-xs">{{ p.tagline }}</div>
+              {% endif %}
+            </td>
+            <td class="table__cell">
+              {% if p.status == "submitted" %}
+              <span class="badge badge--submitted">Submitted</span>
+              {% else %}
+              <span class="badge badge--draft">Draft</span>
+              {% endif %}
+            </td>
+            <td class="table__cell">{{ p.track_name or "Unassigned" }}</td>
+            <td class="table__cell">{{ p.team_name or "Individual" }}</td>
+            <td class="table__cell">
+              {% if p.tech_tags and p.tech_tags.length > 0 %}
+              <div class="flex gap-1 flex-wrap">
+                {% for tag in p.tech_tags %}
+                <span class="code-badge">{{ tag }}</span>
+                {% endfor %}
+              </div>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="table__cell">
+              {% if p.status == "submitted" %}
+              <a class="button button--secondary button--sm" href="/gallery/{{ p.id }}">View &rarr;</a>
+              {% else %}
+              <span class="text-muted text-xs">Draft</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state__title">No projects yet.</p>
+      <p class="empty-state__text">When participants submit projects during the open submission window, they will appear here.</p>
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/manage">Back to Event Hub</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

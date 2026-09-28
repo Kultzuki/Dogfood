@@ -9,16 +9,7 @@
     </p>
   </div>
 
-  {% if flash and flash.ok %}
-  <div class="alert alert--success" role="alert">
-    {{ flash.ok }}
-  </div>
-  {% endif %}
-  {% if flash and flash.err %}
-  <div class="alert alert--error" role="alert">
-    {{ flash.err }}
-  </div>
-  {% endif %}
+
 
   {% if score %}
   <div class="alert alert--success" role="status">

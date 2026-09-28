@@ -29,9 +29,9 @@ interface EventRow {
   updated_at: Date;
 }
 interface RoleRow { role: string }
-interface CreateBody { name?: string; description?: string }
+interface CreateBody { name?: string; description?: string; starts_at?: unknown; ends_at?: unknown; submissions_open_at?: unknown; submissions_close_at?: unknown }
 interface TransitionBody { toState?: string; expectedVersion?: number }
-interface UpdateBody { name?: string; description?: string }
+interface UpdateBody { name?: string; description?: string; starts_at?: unknown; ends_at?: unknown; submissions_open_at?: unknown; submissions_close_at?: unknown }
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -87,6 +87,50 @@ async function isMember(eventId: string, userId: string): Promise<boolean> {
   return (res.rowCount ?? 0) > 0;
 }
 
+export function parseIsoNullable(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null || v === "") return null;
+  if (typeof v !== "string") return undefined;
+  const ms = Date.parse(v);
+  if (!Number.isFinite(ms)) return undefined;
+  return new Date(ms).toISOString();
+}
+
+export function dateRangeError(dates: {
+  starts_at?: string | null;
+  ends_at?: string | null;
+  submissions_open_at?: string | null;
+  submissions_close_at?: string | null;
+}): string | null {
+  const { starts_at: s, ends_at: e, submissions_open_at: o, submissions_close_at: c } = dates;
+  if (s && e && Date.parse(s) > Date.parse(e)) return "invalid_date_range";
+  if (o && c && !(Date.parse(o) < Date.parse(c))) return "invalid_date_range";
+  return null;
+}
+
+/**
+ * Pure mirror of the SQL submission-window predicate used by the project
+ * routes (`(open IS NULL OR now() >= open) AND (close IS NULL OR now() <=
+ * close)`). The database clock remains authoritative; this helper exists
+ * so edge semantics are unit-pinned in one place.
+ */
+export function isSubmissionOpen(
+  openAt: string | Date | null | undefined,
+  closeAt: string | Date | null | undefined,
+  nowMs: number,
+): boolean {
+  if (openAt !== null && openAt !== undefined) {
+    const open = new Date(openAt).getTime();
+    if (!Number.isFinite(open) || nowMs < open) return false;
+  }
+  if (closeAt !== null && closeAt !== undefined) {
+    const close = new Date(closeAt).getTime();
+    if (!Number.isFinite(close)) return false;
+    if (nowMs > close) return false;
+  }
+  return true;
+}
+
 // ── Routes ────────────────────────────────────────────────────────────
 
 async function eventRoutes(app: FastifyInstance): Promise<void> {
@@ -101,12 +145,21 @@ async function eventRoutes(app: FastifyInstance): Promise<void> {
     if (!canCreate(await getSystemRole(userId))) {
       return reply.code(404).send({ error: "not_found" });
     }
+    const starts_at = parseIsoNullable(body.starts_at);
+    const ends_at = parseIsoNullable(body.ends_at);
+    const submissions_open_at = parseIsoNullable(body.submissions_open_at);
+    const submissions_close_at = parseIsoNullable(body.submissions_close_at);
+    if (starts_at === undefined || ends_at === undefined || submissions_open_at === undefined || submissions_close_at === undefined) {
+      return reply.code(422).send({ error: "invalid_date" });
+    }
+    const rangeErr = dateRangeError({ starts_at: starts_at ?? undefined, ends_at: ends_at ?? undefined, submissions_open_at: submissions_open_at ?? undefined, submissions_close_at: submissions_close_at ?? undefined });
+    if (rangeErr) return reply.code(422).send({ error: rangeErr });
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
       const res = await client.query(
-        `INSERT INTO events (name, description, created_by) VALUES ($1, $2, $3) RETURNING *`,
-        [name, description, userId],
+        `INSERT INTO events (name, description, created_by, starts_at, ends_at, submissions_open_at, submissions_close_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [name, description, userId, starts_at ?? null, ends_at ?? null, submissions_open_at ?? null, submissions_close_at ?? null],
       );
       const event = res.rows[0] as EventRow;
       await client.query(
@@ -163,7 +216,35 @@ async function eventRoutes(app: FastifyInstance): Promise<void> {
     if (typeof body.description === "string" || body.description === null) {
       sets.push(`description = $${idx++}`); values.push(body.description);
     }
+    const dateKeys = ["starts_at", "ends_at", "submissions_open_at", "submissions_close_at"] as const;
+    const parsedDates: Record<string, string | null> = {};
+    for (const k of dateKeys) {
+      if (body[k] !== undefined) {
+        const p = parseIsoNullable(body[k]);
+        if (p === undefined) return reply.code(422).send({ error: "invalid_date" });
+        parsedDates[k] = p;
+        sets.push(`${k} = $${idx++}`); values.push(p);
+      }
+    }
     if (sets.length === 0) return reply.code(422).send({ error: "invalid_input" });
+    if (Object.keys(parsedDates).length > 0) {
+      const cur = await pool.query(`SELECT starts_at, ends_at, submissions_open_at, submissions_close_at FROM events WHERE id = $1`, [id]);
+      const row = cur.rows[0] as Record<string, Date | string | null> | undefined;
+      if (!row) return reply.code(404).send({ error: "not_found" });
+      const iso = (v: unknown): string | undefined => {
+        if (v === null || v === undefined) return undefined;
+        const d = v instanceof Date ? v.toISOString() : String(v);
+        return d;
+      };
+      const effective = {
+        starts_at: parsedDates.starts_at !== undefined ? parsedDates.starts_at ?? undefined : iso(row.starts_at),
+        ends_at: parsedDates.ends_at !== undefined ? parsedDates.ends_at ?? undefined : iso(row.ends_at),
+        submissions_open_at: parsedDates.submissions_open_at !== undefined ? parsedDates.submissions_open_at ?? undefined : iso(row.submissions_open_at),
+        submissions_close_at: parsedDates.submissions_close_at !== undefined ? parsedDates.submissions_close_at ?? undefined : iso(row.submissions_close_at),
+      };
+      const rangeErr = dateRangeError(effective);
+      if (rangeErr) return reply.code(422).send({ error: rangeErr });
+    }
     sets.push(`updated_at = now()`); values.push(id);
     const res = await pool.query(
       `UPDATE events SET ${sets.join(", ")} WHERE id = $${idx} RETURNING *`, values,

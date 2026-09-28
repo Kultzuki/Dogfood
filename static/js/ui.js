@@ -165,6 +165,31 @@
     });
   }
 
+  function initSlugAuto() {
+    if (typeof document.querySelectorAll !== "function") return;
+    var sources = document.querySelectorAll("[data-slug-source]");
+    if (!sources || sources.length === 0) return;
+    Array.prototype.forEach.call(sources, function (source) {
+      var targetId = source.getAttribute("data-slug-source");
+      var target = document.getElementById(targetId);
+      if (!target) return;
+      var userEdited = target.value.trim().length > 0;
+      target.addEventListener("input", function () {
+        userEdited = target.value.trim().length > 0;
+      });
+      source.addEventListener("input", function () {
+        if (userEdited) return;
+        var slug = source.value
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .substring(0, 100);
+        target.value = slug;
+      });
+    });
+  }
+
   onReady(function () {
     initConfirm();
     initRubricSum();
@@ -172,5 +197,7 @@
     initCountdown();
     initTrackHint();
     initPendingState();
+    initSlugAuto();
   });
 })();
+

@@ -7,6 +7,9 @@
  *   scores-normalized: project_id,normalized,raw_mean,n,rank
  *   rankings:          project_id,normalized,raw_mean,n,rank (same row order as engine rank output)
  *   audit:             seq,event_id,actor_user_id,action,resource_type,resource_id,created_at
+ *   projects:          id,event_id,team_id,track_id,title,status,created_at
+ *   teams:             id,event_id,name,max_size,leader_user_id,created_at
+ *   judges:            event_id,user_id,role,track_id,created_at (event_memberships role=judge)
  *
  * AUTHZ (enforced in src/routes/exports.ts, organizer-only for every
  * dataset — simplest defensible posture; judges cannot export even their
@@ -72,6 +75,33 @@ export const VOTES_COLUMNS = [
   "created_at",
 ] as const;
 
+export const PROJECTS_COLUMNS = [
+  "id",
+  "event_id",
+  "team_id",
+  "track_id",
+  "title",
+  "status",
+  "created_at",
+] as const;
+
+export const TEAMS_COLUMNS = [
+  "id",
+  "event_id",
+  "name",
+  "max_size",
+  "leader_user_id",
+  "created_at",
+] as const;
+
+export const JUDGES_COLUMNS = [
+  "event_id",
+  "user_id",
+  "role",
+  "track_id",
+  "created_at",
+] as const;
+
 export const COMMENTS_COLUMNS = [
   "id",
   "event_id",
@@ -88,7 +118,10 @@ export type ExportDataset =
   | "rankings"
   | "audit"
   | "votes"
-  | "comments";
+  | "comments"
+  | "projects"
+  | "teams"
+  | "judges";
 
 export type ImportDataset = "assignments" | "scores";
 
@@ -100,6 +133,9 @@ export const EXPORT_DATASETS: readonly ExportDataset[] = [
   "audit",
   "votes",
   "comments",
+  "projects",
+  "teams",
+  "judges",
 ];
 
 export function headerFor(dataset: ExportDataset): readonly string[] {
@@ -118,6 +154,12 @@ export function headerFor(dataset: ExportDataset): readonly string[] {
       return VOTES_COLUMNS;
     case "comments":
       return COMMENTS_COLUMNS;
+    case "projects":
+      return PROJECTS_COLUMNS;
+    case "teams":
+      return TEAMS_COLUMNS;
+    case "judges":
+      return JUDGES_COLUMNS;
   }
 }
 

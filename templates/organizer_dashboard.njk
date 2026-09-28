@@ -1,0 +1,138 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header text-left">
+    <h1 class="card__title text-left">Organizer Dashboard</h1>
+    <p class="text-muted">Welcome back{% if currentUser and currentUser.name %}, {{ currentUser.name }}{% endif %}! Manage your hackathons, judging, teams, and results from here.</p>
+  </div>
+
+  <!-- Overall Platform Metrics -->
+  <div class="card__body">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-card__value">{{ totalEvents }}</div>
+        <div class="stat-card__label">Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ totalTeams }}</div>
+        <div class="stat-card__label">Total Teams</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ totalProjects }}</div>
+        <div class="stat-card__label">Projects</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ totalJudges }}</div>
+        <div class="stat-card__label">Judges</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ totalScores }}</div>
+        <div class="stat-card__label">Reviews</div>
+      </div>
+    </div>
+
+    <!-- Quick Action Bar -->
+    <div class="quick-actions mb-6">
+      <a class="button button--primary" href="/events/new">+ Create Event</a>
+      <a class="button button--secondary" href="/events">Manage Events</a>
+      <a class="button button--secondary" href="/judging">Judging Hub</a>
+      <a class="button button--secondary" href="/results">Results &amp; Rankings</a>
+      <a class="button button--secondary" href="/gallery">Public Gallery</a>
+    </div>
+  </div>
+
+  <!-- Events List -->
+  <div class="card__body border-top">
+    <div class="flex justify-between items-center mb-4">
+      <div>
+        <h2 class="mb-0">My Events</h2>
+        <p class="text-muted text-sm">Active and upcoming hackathons you organize</p>
+      </div>
+      <a class="button button--secondary button--sm" href="/events">View all events &rarr;</a>
+    </div>
+
+    {% if events and events.length > 0 %}
+    <div class="event-card-list">
+      {% for e in events %}
+      <div class="event-card">
+        <div class="event-card__header">
+          <div>
+            <h3 class="text-lg mb-1">
+              <a class="event-card__title" href="/events/{{ e.id }}/manage">{{ e.name }}</a>
+            </h3>
+            <div class="flex items-center gap-2 flex-wrap">
+              {% if e.state == "DRAFT" %}
+              <span class="badge badge--draft">{{ e.state }}</span>
+              {% elif e.state == "REGISTRATION_OPEN" %}
+              <span class="badge badge--pending">{{ e.state }}</span>
+              {% elif e.state == "SUBMISSIONS_OPEN" %}
+              <span class="badge badge--submitted">{{ e.state }}</span>
+              {% elif e.state == "SUBMISSIONS_CLOSED" %}
+              <span class="badge badge--warning">{{ e.state }}</span>
+              {% elif e.state == "JUDGING" %}
+              <span class="badge badge--scored">{{ e.state }}</span>
+              {% elif e.state == "RESULTS_FINAL" or e.state == "PUBLISHED" %}
+              <span class="badge badge--success">{{ e.state }}</span>
+              {% else %}
+              <span class="badge">{{ e.state }}</span>
+              {% endif %}
+              <span class="text-muted text-xs">v{{ e.version }}</span>
+            </div>
+          </div>
+          <div class="event-card__actions">
+            <a class="button button--primary button--sm" href="/events/{{ e.id }}/manage">Manage Event</a>
+          </div>
+        </div>
+
+        {% if e.description %}
+        <p class="event-card__desc">{{ e.description }}</p>
+        {% endif %}
+
+        <div class="event-card__metrics">
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.team_count }}</span>
+            <span class="event-card__metric-lbl">Teams</span>
+          </div>
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.project_count }}</span>
+            <span class="event-card__metric-lbl">Projects ({{ e.submitted_project_count }} submitted)</span>
+          </div>
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.judge_count }}</span>
+            <span class="event-card__metric-lbl">Judges</span>
+          </div>
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.score_count }}</span>
+            <span class="event-card__metric-lbl">Scores</span>
+          </div>
+        </div>
+
+        <div class="event-card__footer">
+          <div class="event-card__dates">
+            {% if e.next_step_hint %}
+            <span class="text-primary font-medium">Next: {{ e.next_step_hint }}</span>
+            {% elif e.submissions_close_formatted %}
+            <span>Deadline: {{ e.submissions_close_formatted }}</span>
+            {% else %}
+            <span>Manage schedule &amp; tracks</span>
+            {% endif %}
+          </div>
+          <div class="flex gap-2">
+            <a class="button button--secondary button--sm" href="/events/{{ e.id }}/judging-progress">Judging</a>
+            <a class="button button--secondary button--sm" href="/events/{{ e.id }}/manage">Configure &rarr;</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state__title">No events created yet.</p>
+      <p class="empty-state__text">You haven't created any hackathon events. Get started in minutes by creating your first event.</p>
+      <a class="button button--primary" href="/events/new">Create Event</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

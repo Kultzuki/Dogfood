@@ -13,11 +13,7 @@
   </div>
   {% endif %}
 
-  {% if flash %}
-  <div class="alert alert--{{ flash.kind }}" role="status">
-    {{ flash.message }}
-  </div>
-  {% endif %}
+
 
   <form class="form" method="post" action="/events/new">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">

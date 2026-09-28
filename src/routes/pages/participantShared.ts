@@ -10,7 +10,7 @@
 import type { FastifyRequest } from "fastify";
 import type { PoolClient } from "pg";
 import { pool } from "../../db/index.js";
-import { consumeFlash, type FlashMessage } from "../../lib/flash.js";
+import { getFlash, type FlashMessage } from "../../lib/flash.js";
 
 /** Loose UUID check — same shape as the API routes (never 403, 422 first). */
 export const UUID_RE =
@@ -32,6 +32,8 @@ export interface TeamInfo {
   invite_token: string;
   max_size: number;
   member_count: number;
+  leader_user_id: string | null;
+  leader_name: string | null;
 }
 
 export interface MemberInfo {
@@ -113,6 +115,8 @@ interface TeamRow {
   invite_token: string;
   max_size: number;
   member_count: string;
+  leader_user_id: string | null;
+  leader_name: string | null;
 }
 
 /** The caller's team in this event (one team per user+event by DB unique). */
@@ -120,13 +124,27 @@ export async function getMyTeam(
   eventId: string,
   userId: string,
 ): Promise<TeamInfo | undefined> {
-  const r = await pool.query<TeamRow>(
-    `SELECT t.id, t.event_id, t.name, t.invite_token, t.max_size,
-            (SELECT COUNT(*) FROM team_members m WHERE m.team_id = t.id) AS member_count
-       FROM teams t JOIN team_members m ON m.team_id = t.id
-      WHERE m.user_id = $1 AND m.event_id = $2 LIMIT 1`,
-    [userId, eventId],
-  );
+  let r;
+  try {
+    r = await pool.query<TeamRow>(
+      `SELECT t.id, t.event_id, t.name, t.invite_token, t.max_size,
+              (SELECT COUNT(*) FROM team_members m WHERE m.team_id = t.id) AS member_count,
+              t.leader_user_id,
+              (SELECT u.name FROM users u WHERE u.id = t.leader_user_id) AS leader_name
+         FROM teams t JOIN team_members m ON m.team_id = t.id
+        WHERE m.user_id = $1 AND m.event_id = $2 LIMIT 1`,
+      [userId, eventId],
+    );
+  } catch {
+    r = await pool.query<TeamRow>(
+      `SELECT t.id, t.event_id, t.name, t.invite_token, t.max_size,
+              (SELECT COUNT(*) FROM team_members m WHERE m.team_id = t.id) AS member_count,
+              NULL AS leader_user_id, NULL AS leader_name
+         FROM teams t JOIN team_members m ON m.team_id = t.id
+        WHERE m.user_id = $1 AND m.event_id = $2 LIMIT 1`,
+      [userId, eventId],
+    );
+  }
   const t = r.rows[0];
   if (!t) return undefined;
   return { ...t, member_count: Number(t.member_count) };
@@ -210,8 +228,8 @@ export function parseTechTags(raw: unknown): string[] {
     .filter((s) => s.length > 0);
 }
 
-/** Consumed session flash as optional view scope (absent → omitted). */
+/** Session flash as optional view scope (already consumed by shell hook). */
 export function flashScope(req: FastifyRequest): { flash?: FlashMessage } {
-  const flash = consumeFlash(req);
+  const flash = getFlash(req);
   return flash ? { flash } : {};
 }

@@ -1,30 +1,33 @@
-# Threat Model (First Draft — Prep Phase)
+# Threat Model
 
-Scope: the platform as implemented today (Prompts 1–5). Voting and
-comments do not exist yet, so voting threats are assessed against
-controls present, with gaps stated plainly. Nothing below claims a
-control that is not in the tree; verify each citation with grep.
+Scope: the platform as implemented today (T1–T2 claimed; T3 voting +
+comments and T4 webhooks/certificates also present). Nothing below claims
+a control that is not in the tree; verify each citation with grep.
 
 ## 1. Sybil voting
 
-**Status: not addressed.** There is no voting subsystem yet, and account
-creation has no email verification, no CAPTCHA, and no proof-of-personhood.
-The only friction is the auth throttle (`src/lib/rateLimit.ts`: 30
-register/login attempts per 10 min per IP, `TRUST_PROXY`-gated XFF), which
-slows but does not stop mass registration. When voting lands (roadmap
-T3), it MUST NOT trust user identity alone: plan is `voter_key` UNIQUE
-per event+project, IP-hash token buckets, and hidden results until
-publish. Until then, any claim of Sybil resistance would be false.
+**Status: partially addressed.** Community voting exists
+(`src/routes/community.ts`, `drizzle/0014_community.sql`): authenticated
+users only, one vote per (event, project, user) via DB UNIQUE, voting
+window on the DB clock, counts hidden (404) while voting is active,
+60/h throttle + 100/h per-user velocity cap + audit `vote.cast`.
+Residual gap: account creation has no email verification, no CAPTCHA, and
+no proof-of-personhood — one human can hold many accounts, so the unique
+constraint binds accounts, not humans. The auth throttle
+(`src/lib/rateLimit.ts`: 30 register/login attempts per 10 min per IP)
+slows but does not stop mass registration. Any claim of Sybil resistance
+would be false.
 
 ## 2. Ballot stuffing
 
-**Status: not addressed (no ballots exist).** No vote table, no
-replay protection, no per-IP accounting exists today. Residual control
-worth noting: all state-changing routes require CSRF tokens
+**Status: partially addressed.** Votes are one-row-per-voter
+(DB-enforced, concurrent double-POSTs collapse to 409), replay is
+meaningless (no unvote, rows never updated), counts are hidden until the
+window closes, and velocity signals are audited. Residual control worth
+noting: all state-changing routes require CSRF tokens
 (`src/plugins/csrf.ts`), so cross-site forged writes are blocked — but
 that stops third-party forgery, not a first-party stuffer with a valid
-session. The T3 design (unique voter keys + DB-enforced one-row-per-voter
-+ concurrent double-POST hammer test) is specified but unbuilt.
+session. No statistical stuffing detection exists.
 
 ## 3. Submission scraping
 

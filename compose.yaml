@@ -11,31 +11,31 @@ services:
     environment:
       DATABASE_URL: postgres://dogfood:dogfood@db:5432/dogfood
       # ── SESSION_SECRET ────────────────────────────────────────────────
-      # The default below is a DETERMINISTIC LOCAL-SANDBOX VALUE, not a real
-      # secret. It is pinned so that the committed acceptance config
-      # (.dogfood.toml) keeps verifying its fixed `sid` tokens across a
-      # `docker compose down -v` reset — without it, the official checker
-      # scores 5/7 on a fresh boot because every volume gets a new random
-      # secret.
-      #
-      # ⚠️  OVERRIDE THIS FOR ANY REAL DEPLOYMENT. With this default left in
-      # place, anyone who can read this repository can forge a session cookie
-      # for the public fixture tokens and act as the fixture organizer/judges.
-      # Generate your own with `openssl rand -hex 32` and export it, e.g.
+      # No deterministic default is shipped. Leave SESSION_SECRET unset for
+      # a secure first-boot auto-generated secret (persisted to the appdata
+      # volume, 0600, reused on restart — see docker/entrypoint.sh).
+      # For a real deployment, always supply your own:
       #   SESSION_SECRET=$(openssl rand -hex 32) docker compose up -d
-      # Omit the value entirely to fall back to first-boot auto-generation
-      # (stored in the appdata volume) — but then .dogfood.toml will not work.
-      SESSION_SECRET: "${SESSION_SECRET:-dogfood-local-demo-session-secret-0000000000}"
+      #
+      # Acceptance harness note: the committed .dogfood.toml cookies are
+      # HMAC-signed with whatever secret the app booted with. After
+      # `docker compose up`, copy the printed `Cookie: sid=...` lines
+      # (organizer / judge_a / judge_b / participant) into .dogfood.toml,
+      # then run `py -3 stuff/run.py .dogfood.toml`.
+      # A deterministic local-sandbox secret is available ONLY as an
+      # explicit opt-in for checker reproducibility:
+      #   SESSION_SECRET=dogfood-local-demo-session-secret-0000000000 docker compose up -d
+      # Never use that value outside a throwaway local sandbox.
+      SESSION_SECRET: "${SESSION_SECRET:-}"
       NODE_ENV: production
-      # ── LOCAL DEMO ONLY ────────────────────────────────────────────
+      # ── DEMO ACCOUNTS (opt-in only) ──────────────────────────────────
       # Seeds four fixed password accounts (test.organizer / test.judgea /
       # test.judgeb / test.participant @dogfood.local, shared password) so a
-      # human can drive the browser UI locally. They are NOT the acceptance
-      # fixture identities and .dogfood.toml never references them.
-      # SET THIS TO 0 (or add `DOGFOOD_DEMO_ACCOUNTS=0` to a .env file next to
-      # this file) FOR ANY DEPLOYMENT THAT IS NOT A LOCAL SANDBOX — and set
-      # your own SESSION_SECRET at the same time.
-      DOGFOOD_DEMO_ACCOUNTS: "${DOGFOOD_DEMO_ACCOUNTS:-1}"
+      # human can drive the browser UI locally or record the demo video.
+      # They are NOT the acceptance fixture identities and .dogfood.toml
+      # never references them. DEFAULT IS 0 (disabled). Enable explicitly:
+      #   DOGFOOD_DEMO_ACCOUNTS=1 docker compose up -d
+      DOGFOOD_DEMO_ACCOUNTS: "${DOGFOOD_DEMO_ACCOUNTS:-0}"
     volumes:
       - appdata:/app/data
     restart: unless-stopped

@@ -40,7 +40,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const FIELDS = ["technical", "innovation", "impact", "polish"] as const;
 type Field = (typeof FIELDS)[number];
 
-import { consumeFlash, setFlash } from "../../lib/flash.js";
+import { setFlash } from "../../lib/flash.js";
 import { compositeFor, fetchActiveRubric, type ActiveRubric } from "../rubrics.js";
 interface QueueRow {
   assignment_id: string; project_title: string; project_tagline: string | null;
@@ -64,12 +64,6 @@ function getUserId(req: FastifyRequest): string | undefined {
   const u = req.session.user as Record<string, unknown> | undefined;
   if (typeof u === "object" && u !== null && typeof u.id === "string" && u.id.length > 0) return u.id;
   return undefined;
-}
-/** Canonical flash ({kind, message} | null) adapted to the {ok, err} template shape. */
-function takeFlash(req: FastifyRequest): { ok?: string; err?: string } {
-  const f = consumeFlash(req);
-  if (!f) return {};
-  return f.kind === "success" ? { ok: f.message } : { err: f.message };
 }
 function parseCriterion(v: unknown): number | undefined {
   const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
@@ -158,7 +152,7 @@ export async function registerJudgePages(app: FastifyInstance): Promise<void> {
     const scored = items.filter((i) => i.state === "SCORED").length;
     const total = items.length;
     return reply.view("judge_queue.njk", {
-      csrfToken: req.csrfToken(), flash: takeFlash(req), eventId, items,
+      csrfToken: req.csrfToken(), eventId, items,
       scored, total, pct: total > 0 ? Math.round((scored / total) * 100) : 100,
       scopeLabel: scopeTrack === null ? "All tracks" : (mem.rows[0]?.name ?? "Assigned track"),
     });
@@ -173,7 +167,7 @@ export async function registerJudgePages(app: FastifyInstance): Promise<void> {
     if (ballot === undefined) return;
     const { row, rubric } = ballot;
     return reply.view("judge_ballot.njk", {
-      csrfToken: req.csrfToken(), flash: takeFlash(req), eventId: row.event_id,
+      csrfToken: req.csrfToken(), eventId: row.event_id,
       assignment: { id: row.id },
       project: { title: row.title, tagline: row.tagline, description: row.description, techTags: row.tech_tags ?? [], status: row.project_status },
       trackName: row.track_name, uploads: await loadUploads(row.project_id),
@@ -209,9 +203,10 @@ export async function registerJudgePages(app: FastifyInstance): Promise<void> {
       rubric: { version: rubric.version, weights: rubric.weights },
     };
     if (errors.technical !== undefined || errors.innovation !== undefined || errors.impact !== undefined || errors.polish !== undefined) {
-      return reply.code(422).view("judge_ballot.njk", { ...base, flash: takeFlash(req), values: echo, errors, compositePreview: "" });
+      return reply.code(422).view("judge_ballot.njk", { ...base, values: echo, errors, compositePreview: "" });
     }
     const value = compositeOf(parsed as Record<Field, number>, rubric.weights);
+    const criteriaJson = JSON.stringify(parsed);
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -224,14 +219,30 @@ export async function registerJudgePages(app: FastifyInstance): Promise<void> {
       const cur = (await client.query<CurRow>(`SELECT id, version FROM scores WHERE assignment_id = $1 AND is_current = true LIMIT 1 FOR UPDATE`, [assignmentId])).rows[0];
       let version = 1;
       if (cur === undefined) {
-        const ins = await client.query<CurRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, rubric_version) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, version`,
-          [assignmentId, la.event_id, la.project_id, userId, value, rubric.version]);
-        version = ins.rows[0]?.version ?? 1;
+        let inserted: CurRow | undefined;
+        try {
+          inserted = (await client.query<CurRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, rubric_version, criteria) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) RETURNING id, version`,
+            [assignmentId, la.event_id, la.project_id, userId, value, rubric.version, criteriaJson])).rows[0];
+        } catch (e) {
+          if (typeof e === "object" && e !== null && (e as { code?: string }).code === "42703") {
+            inserted = (await client.query<CurRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, rubric_version) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, version`,
+              [assignmentId, la.event_id, la.project_id, userId, value, rubric.version])).rows[0];
+          } else throw e;
+        }
+        version = inserted?.version ?? 1;
       } else {
-        const ins = await client.query<CurRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, version, supersedes_id, rubric_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, version`,
-          [la.id, la.event_id, la.project_id, userId, value, cur.version + 1, cur.id, rubric.version]);
+        let inserted: CurRow | undefined;
+        try {
+          inserted = (await client.query<CurRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, version, supersedes_id, rubric_version, criteria) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb) RETURNING id, version`,
+            [la.id, la.event_id, la.project_id, userId, value, cur.version + 1, cur.id, rubric.version, criteriaJson])).rows[0];
+        } catch (e) {
+          if (typeof e === "object" && e !== null && (e as { code?: string }).code === "42703") {
+            inserted = (await client.query<CurRow>(`INSERT INTO scores (assignment_id, event_id, project_id, judge_user_id, value, version, supersedes_id, rubric_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, version`,
+              [la.id, la.event_id, la.project_id, userId, value, cur.version + 1, cur.id, rubric.version])).rows[0];
+          } else throw e;
+        }
         await client.query(`UPDATE scores SET is_current = false WHERE id = $1`, [cur.id]);
-        version = ins.rows[0]?.version ?? cur.version + 1;
+        version = inserted?.version ?? cur.version + 1;
       }
       await client.query("COMMIT");
       setFlash(req, "success", `Score saved (v${version}, composite ${value}).`);

@@ -82,7 +82,7 @@ export async function registerParticipantProjectPages(
     // DB-clock deadline gate (mirrors edit/submit): NULL submissions_close_at = open.
     {
       const dl = await pool.query(
-        "SELECT COALESCE(now() <= submissions_close_at, true) AS open FROM events WHERE id = $1",
+        "SELECT ((submissions_open_at IS NULL OR now() >= submissions_open_at) AND (submissions_close_at IS NULL OR now() <= submissions_close_at)) AS open FROM events WHERE id = $1",
         [eventId],
       );
       if ((dl.rowCount ?? 0) === 0) return reply.code(404).send({ error: "not_found" });
@@ -179,7 +179,7 @@ export async function registerParticipantProjectPages(
     try {
       await client.query("BEGIN");
       const cur = await client.query(
-        `SELECT p.*, (SELECT now() > e.submissions_close_at FROM events e WHERE e.id = p.event_id) AS past_due
+        `SELECT p.*, ((SELECT e.submissions_open_at IS NOT NULL AND now() < e.submissions_open_at FROM events e WHERE e.id = p.event_id) OR (SELECT e.submissions_close_at IS NOT NULL AND now() > e.submissions_close_at FROM events e WHERE e.id = p.event_id)) AS past_due
            FROM projects p WHERE p.id = $1 AND p.event_id = $2 FOR UPDATE`, [projectId, eventId],
       );
       const row = cur.rows[0] as (ProjectInfo & { past_due: boolean | null }) | undefined;

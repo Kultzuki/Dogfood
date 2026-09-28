@@ -1,0 +1,105 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a class="breadcrumb__link" href="/events">Events</a>
+    <span class="breadcrumb__separator">/</span>
+    <a class="breadcrumb__link" href="/events/{{ event.id }}/manage">{{ event.name }}</a>
+    <span class="breadcrumb__separator">/</span>
+    <span class="breadcrumb__current">Teams</span>
+  </nav>
+
+  <div class="card__header card__header--split">
+    <div>
+      <h1 class="card__title card__title--left mb-0">Teams &amp; Participants</h1>
+      <p class="text-muted">Manage teams, invite links, and participant capacity for {{ event.name }}.</p>
+    </div>
+    <a class="button button--secondary button--sm" href="/events/{{ event.id }}/manage">&larr; Back to Manage Event</a>
+  </div>
+
+  {% if error %}
+  <div class="alert alert--error alert--inset" role="alert">
+    <strong>Error:</strong> {{ error }}
+  </div>
+  {% endif %}
+
+  <!-- Teams List -->
+  <div class="card__body">
+    <h2 class="text-xl mb-1">Registered Teams ({{ teams.length }})</h2>
+    <p class="section-desc">Each team has a unique invite link that participants can use to join.</p>
+
+    {% if teams and teams.length > 0 %}
+    <div class="table-wrapper mb-6">
+      <table class="table">
+        <thead class="table__head">
+          <tr class="table__row">
+            <th class="table__header-cell" scope="col">Team Name</th>
+            <th class="table__header-cell" scope="col">Members / Capacity</th>
+            <th class="table__header-cell" scope="col">Invite Link</th>
+            <th class="table__header-cell" scope="col">Token Rotation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in teams %}
+          <tr class="table__row">
+            <td class="table__cell">
+              <strong>{{ t.name }}</strong>
+              {% if t.leader_name %}<div class="text-muted text-xs">Leader: {{ t.leader_name }}</div>{% endif %}
+            </td>
+            <td class="table__cell">
+              <span class="badge badge--info">{{ t.member_count }} / {{ t.max_size }}</span>
+            </td>
+            <td class="table__cell">
+              <div class="flex items-center gap-1">
+                <input class="form__input input-token" type="text" readonly value="{{ t.invite_url }}" onclick="this.select();">
+              </div>
+            </td>
+            <td class="table__cell">
+              <form class="form--flush" method="post" action="/events/{{ event.id }}/teams/{{ t.id }}/rotate">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button class="button button--secondary button--sm" type="submit" data-confirm="Rotate invite link for {{ t.name }}? The previous invite link will stop working immediately.">
+                  Rotate Link
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state mb-6">
+      <p class="empty-state__title">No teams formed yet.</p>
+      <p class="empty-state__text">Participants can create teams once registration is open, or you can create seed teams below.</p>
+    </div>
+    {% endif %}
+
+    <!-- Create Team Form -->
+    <div class="hub-card">
+      <h3 class="text-base mb-3">Create a Team (Organizer)</h3>
+      <form class="form form--flush" method="post" action="/events/{{ event.id }}/teams">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        <div class="split-view">
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="team-name">Team Name</label>
+            <input class="form__input" type="text" id="team-name" name="name" required autocomplete="off" placeholder="e.g. Neural Ninjas">
+          </div>
+
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="team-size">Max Team Size</label>
+            <input class="form__input" type="number" id="team-size" name="maxSize" min="1" max="20" value="4">
+            <span class="form__help">Capacity limit (1–20 members).</span>
+          </div>
+        </div>
+
+        <div class="form__actions form__actions--start mt-3">
+          <button class="button button--primary button--sm" type="submit">Create Team &amp; Generate Invite Link</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

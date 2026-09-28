@@ -10,9 +10,7 @@
   {% if error %}
   <div class="alert alert--error" role="alert">{{ error }}</div>
   {% endif %}
-  {% if flash %}
-  <div class="alert alert--{{ flash.kind }}" role="status">{{ flash.message }}</div>
-  {% endif %}
+
 
   <div class="card__body">
     <h2>CSV exports</h2>

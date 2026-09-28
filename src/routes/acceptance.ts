@@ -64,7 +64,7 @@ async function loadFixtureEvent(): Promise<FixtureEvent | undefined> {
   // clock (now() <= submissions_close_at ⇒ open; now() > ⇒ closed). The
   // fixture's submissions_close is a past date, so past_due is true.
   const r = await pool.query<FixtureEvent>(
-    `SELECT id, (NOW() > submissions_close_at) AS past_due
+    `SELECT id, ((submissions_open_at IS NOT NULL AND NOW() < submissions_open_at) OR (NOW() > submissions_close_at)) AS past_due
        FROM events WHERE name = $1 ORDER BY created_at DESC LIMIT 1`,
     [FIXTURE_EVENT_NAME],
   );

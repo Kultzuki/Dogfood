@@ -1,0 +1,94 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header">
+    <h1 class="card__title">My Account</h1>
+    <p class="text-muted text-center">Profile information and event access</p>
+  </div>
+
+  <div class="card__body">
+    <h2>Profile</h2>
+    <div class="stat-grid mt-4">
+      <div class="stat-card">
+        <div class="stat-card__value text-base">{{ user.name }}</div>
+        <div class="stat-card__label">Name</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value text-base break-all">{{ user.email }}</div>
+        <div class="stat-card__label">Email</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value text-base">
+          <span class="badge badge--info">{{ user.role }}</span>
+        </div>
+        <div class="stat-card__label">System Role</div>
+      </div>
+      {% if user.createdAt %}
+      <div class="stat-card">
+        <div class="stat-card__value text-base">{{ user.createdAt }}</div>
+        <div class="stat-card__label">Member Since</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card__body">
+    <h2>Event Memberships</h2>
+    {% if memberships and memberships.length > 0 %}
+    <div class="table-wrapper mt-4">
+      <table class="table">
+        <thead class="table__head">
+          <tr class="table__row">
+            <th class="table__header-cell" scope="col">Event</th>
+            <th class="table__header-cell" scope="col">Status</th>
+            <th class="table__header-cell" scope="col">Your Role</th>
+            <th class="table__header-cell" scope="col">Track Scope</th>
+            <th class="table__header-cell" scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in memberships %}
+          <tr class="table__row">
+            <td class="table__cell"><strong>{{ m.name }}</strong></td>
+            <td class="table__cell"><span class="badge">{{ m.state }}</span></td>
+            <td class="table__cell"><span class="badge badge--info">{{ m.role }}</span></td>
+            <td class="table__cell">{{ m.track_name or "All tracks" }}</td>
+            <td class="table__cell">
+              {% if m.role == "organizer" or user.role == "admin" %}
+              <a class="button button--secondary button--sm" href="/events/{{ m.event_id }}/manage">Manage</a>
+              {% elif m.role == "judge" %}
+              <a class="button button--secondary button--sm" href="/events/{{ m.event_id }}/judge">Score Queue</a>
+              {% else %}
+              <a class="button button--secondary button--sm" href="/events/{{ m.event_id }}/dashboard">Dashboard</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state__title">No event memberships</p>
+      <p class="empty-state__text">You are not currently enrolled in any hackathons.</p>
+      {% if user.role == "organizer" or user.role == "admin" %}
+      <a class="button button--primary button--sm" href="/events/new">Create an Event</a>
+      {% else %}
+      <a class="button button--secondary button--sm" href="/gallery">Browse Gallery</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card__body">
+    <h2>Session Actions</h2>
+    <div class="mt-4 flex gap-2">
+      <form method="post" action="/logout">
+        <input type="hidden" name="_csrf" value="{{ csrfToken | escape }}">
+        <button class="button button--danger button--sm" type="submit">Sign Out of Dogfood</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

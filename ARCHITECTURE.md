@@ -33,7 +33,7 @@ analytics, or telemetry are required.
 | `src/app.ts` | Application factory; registers plugins in dependency order. |
 | `src/authz/` | `roles.ts` (role types), `guards.ts` (`requireAuth` 401 / `requireEventRole` + `requireTrackScope` + `requireAssignment` 404-isolation, never 403). |
 | `src/judging/` | Pure deterministic pipeline (`validate → dedupe → exclude → canonical-sort → normalize → aggregate → rank`; `centering` method; tie-break chain; SHA-256 `inputHash`). No I/O, no clocks — see JUDGING.md. |
-| `src/routes/pages/` | Server-rendered UI: `shell.ts` (`/`, `/register`), `participant*.ts` (dashboard, teams, project draft/edit/submit, uploads), `judge.ts` (queue `/events/:eventId/judge`, ballot `/judge/assignments/:id`), `organizer.ts` (`/events/new`, `/events/:eventId/manage`, `judging-progress`, `audit-viewer`, `data`), `community.ts` (T3 ballot `GET/POST /events/:eventId/ballot`, detail comment form `POST /gallery/:projectId/comments`; forms never POST to `/api/*`). |
+| `src/routes/pages/` | Server-rendered UI: `shell.ts` (`/`, `/register`), `participant*.ts` (dashboard with team-create entry, team create/join/roster/leave/leader-transfer, project draft/edit/submit, uploads), `judge.ts` (queue `/events/:eventId/judge`, criteria ballot `/judge/assignments/:id` with server-side composite), `organizer.ts` (`/events/new`, `/events/:eventId/manage` incl. schedule dates, `judging-progress` with finalize + persisted rankings, `audit-viewer`, `data`), `community.ts` (T3 ballot `GET/POST /events/:eventId/ballot`, detail comment form `POST /gallery/:projectId/comments`; forms never POST to `/api/*`). |
 
 ### Plugins (`src/plugins/`)
 
@@ -50,19 +50,20 @@ analytics, or telemetry are required.
 | `health.ts` | `/healthz` (liveness), `/readyz` (readiness with DB check). |
 | `pages.ts` | `GET /` login page. Auth lives in `auth.ts` (`POST /register`, `POST /login`, `POST /logout`, `POST /password-change`). |
 | `auth.ts` | Register/login/logout/password-change; scrypt password hashes; generic `invalid_credentials` (no enumeration); login rate-limited. |
-| `events.ts` | Event CRUD (`POST /events`, `GET /events/:id`, `PUT /events/:id`) + lifecycle transitions (`POST /events/:id/transition`, advisory-locked, optimistic `expectedVersion`). |
+| `events.ts` | Event CRUD (`POST /events`, `GET /events/:id`, `PUT /events/:id`) + lifecycle transitions (`POST /events/:id/transition`, advisory-locked, optimistic `expectedVersion`). Create/update accept `starts_at`, `ends_at`, `submissions_open_at`, `submissions_close_at` (ISO, NULL=open; `open<close`, `start<=end` validated, else 422). |
 | `tracks.ts` | Track/prize CRUD per event (`POST/GET/PATCH/DELETE /api/events/:eventId/tracks…`, same for `prizes…`). |
-| `teams.ts` | Invite-link teams: organizer create (`POST /api/events/:eventId/teams`), token join (`POST …/teams/join`, transactional size cap), token rotation (`PATCH …/rotate`). |
+| `teams.ts` | Self-service invite-link teams: any authenticated user creates (`POST /api/events/:eventId/teams`, creator auto-joins as `leader_user_id` unless organizer-ish), token join (`POST …/teams/join`, transactional size cap), token rotation (`PATCH …/rotate`), leader transfer (`PATCH …` with `leader_user_id`), leave (`DELETE …/teams/:teamId/leave`: 409 with submitted project, sole member dissolves, leader passes to oldest member). |
 | `projects.ts` | JSON project API: draft create, edit, submit (server-time deadline `now() <= submissions_close_at`), read, version history. |
 | `gallery.ts` | Public `GET /gallery` (search `q`, `track` UUID-validated, `tag`); framing-friendly `GET /gallery/embed` (per-route CSP `frame-ancestors *`, no nav/forms/scripts); organizer question admin; team-member custom answers. |
-| `scores.ts` | Assignments (`POST /api/assignments`) + scores with rescore chain; owner isolation via 404 (never 403). |
+| `scores.ts` | Assignments (`POST /api/assignments`) + scores with rescore chain; criteria (`technical/innovation/impact/polish` 0–100, required) validated and computed server-side via `compositeFor(activeWeights,criteria)` into scalar `value`; scalar-only submits rejected (422), conflicting scalar+criteria rejected (422); `criteria` JSONB + `rubric_version` pinned per row; owner isolation via 404 (never 403). |
 | `rubrics.ts` | Weighted rubrics: `GET /api/events/:eventId/rubric` (active weights), `POST …/rubrics` (organizer-only new version, weights sum to 100). |
 | `community.ts` | T3 community voting + comments JSON API: `POST /api/projects/:id/vote` (auth, in-window, one vote per project per user), `GET …/votes` (counts; 404 for non-organizers while voting is active), `GET/POST …/comments` (public list, authenticated create, 1–2000 chars), `POST /api/events/:id/voting-window` (organizer-only window config). Ballot order is `sha256(userId&#124;projectId)` sort — deterministic per voter, stable on refresh. |
 | `webhooks.ts` | T4 per-event webhook subscriptions: CRUD + delivery inspection + explicit retry + on-demand sweep (`POST …/webhooks/process`). Outbox-backed at-least-once delivery, HMAC-signed bodies, fail-closed SSRF guard. Best-effort fanout on vote/comment/score/submit/certificate events (never blocks the trigger). |
 | `certificates.ts` | T4 offline records: `POST /api/events/:eventId/certificates` (organizer, idempotent per event/type/subject), public `GET /api/certificates/:id`, public `GET …/verify` (stored record + `?payload=` tamper check), `GET /api/records/pubkey`, printable `GET /certificates/:id`. Ed25519 over canonical JSON; digest pinned per row. |
 | `api.ts` | T4 REST index: static `GET /api` endpoint map (no DB, public). |
 | `acceptance.ts` | Checker aliases only (no new business logic): `POST /projects/new` (deadline probe), `GET /api/judge/scores[?judge=]` (403-mapped isolation probe), `GET /api/export.csv` (organizer CSV probe). |
-| `exports.ts` | Organizer CSV hub (`GET /api/events/:eventId/export?dataset=…`) + all-or-nothing row import (`POST …/import`). |
+| `finalize.ts` | Persistent normalization: `POST /api/events/:eventId/finalize` (organizer, states SUBMISSIONS_CLOSED/JUDGING/RESULTS_FINAL/PUBLISHED, idempotent per input hash, advisory-locked txn, audit `event.finalize`) + `GET …/rankings` (organizer always; others only after RESULTS_FINAL/PUBLISHED, with `stale` flag). |
+| `exports.ts` | Organizer CSV hub (`GET /api/events/:eventId/export?dataset=…`: assignments, scores-raw, scores-normalized, rankings, audit, votes, comments, projects, teams, judges) + all-or-nothing row import (`POST …/import`). |
 | `audit.ts` | Organizer audit read (`GET /api/events/:eventId/audit`). |
 | `uploads.ts` | Upload metadata + local-disk bytes (`GET /uploads/:id`, members only). |
 

@@ -115,6 +115,28 @@ function exportRecords(dataset: ExportDataset, rows: AnyRow[]): Record<string, s
         project_id: str(r, "project_id"), user_id: str(r, "user_id"),
         body: str(r, "body"), created_at: str(r, "created_at"),
       }));
+    case "projects":
+      return rows.map((r) => ({
+        id: str(r, "id"), event_id: str(r, "event_id"),
+        team_id: str(r, "team_id"), track_id: str(r, "track_id"),
+        title: str(r, "title"), status: str(r, "status"),
+        created_at: str(r, "created_at"),
+      }));
+    case "teams":
+      return rows.map((r) => ({
+        id: str(r, "id"), event_id: str(r, "event_id"),
+        name: str(r, "name"), max_size: str(r, "max_size"),
+        leader_user_id: str(r, "leader_user_id"),
+        created_at: str(r, "created_at"),
+      }));
+    case "judges":
+      return rows
+        .filter((r) => String(r["role"] ?? "") === "judge")
+        .map((r) => ({
+          event_id: str(r, "event_id"), user_id: str(r, "user_id"),
+          role: str(r, "role"), track_id: str(r, "track_id"),
+          created_at: str(r, "created_at"),
+        }));
   }
 }
 
@@ -126,6 +148,9 @@ const EXPORT_SOURCE: Record<ExportDataset, { table: string; order: string }> = {
   audit: { table: "audit_logs", order: "created_at, id" },
   votes: { table: "community_votes", order: "created_at, id" },
   comments: { table: "project_comments", order: "created_at, id" },
+  projects: { table: "projects", order: "created_at, id" },
+  teams: { table: "teams", order: "created_at, id" },
+  judges: { table: "event_memberships", order: "created_at, id" },
 };
 
 async function scopedIds(table: string, eventId: string, ids: string[]): Promise<Set<string>> {

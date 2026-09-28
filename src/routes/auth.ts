@@ -14,6 +14,7 @@
  * Generic error messages prevent email enumeration.
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import "@fastify/view";
 import { randomBytes } from "node:crypto";
 import { pool } from "../db/index.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
@@ -161,9 +162,17 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
     const email =
       typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    const contentType = String(req.headers["content-type"] ?? "");
+    const isForm = contentType.includes("application/x-www-form-urlencoded");
 
     // ── Validate input (422) ─────────────────────────────────
     if (!email || !password) {
+      if (isForm) {
+        return reply.code(422).view("login.njk", {
+          csrfToken: req.csrfToken(),
+          error: "Please enter both email and password.",
+        });
+      }
       return reply.code(422).type("application/json").send({
         error: "invalid_input",
       });
@@ -188,6 +197,12 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
     const valid = await verifyPassword(password, hashToCheck);
 
     if (!user || !valid) {
+      if (isForm) {
+        return reply.code(401).view("login.njk", {
+          csrfToken: req.csrfToken(),
+          error: "Invalid email or password.",
+        });
+      }
       return reply.code(401).type("application/json").send({
         error: GENERIC_AUTH_ERROR,
       });
@@ -200,9 +215,14 @@ async function authRoutes(app: FastifyInstance): Promise<void> {
     req.session = { id: token, userId: user.id };
 
     // Browser form posts expect a redirect; API clients expect JSON.
-    const contentType = String(req.headers["content-type"] ?? "");
-    if (contentType.includes("application/x-www-form-urlencoded")) {
-      return reply.code(302).redirect("/gallery");
+    if (isForm) {
+      if (user.role === "organizer" || user.role === "admin") {
+        return reply.code(302).redirect("/dashboard");
+      }
+      if (user.role === "judge") {
+        return reply.code(302).redirect("/judging");
+      }
+      return reply.code(302).redirect("/dashboard");
     }
 
     return reply.code(200).type("application/json").send({

@@ -14,13 +14,16 @@
       <nav class="header__nav" aria-label="Primary">
         <ul class="header__nav-list">
           {% if currentUser %}
-          <li class="header__nav-item"><a href="/gallery" class="header__nav-link">Gallery</a></li>
-          {% if currentUser.role == "judge" %}
-          <li class="header__nav-item"><a href="/judging" class="header__nav-link">Judging</a></li>
-          {% endif %}
+          <li class="header__nav-item"><a href="/dashboard" class="header__nav-link">Dashboard</a></li>
           {% if currentUser.role == "organizer" or currentUser.role == "admin" %}
           <li class="header__nav-item"><a href="/events" class="header__nav-link">Events</a></li>
+          <li class="header__nav-item"><a href="/judging" class="header__nav-link">Judging</a></li>
+          <li class="header__nav-item"><a href="/results" class="header__nav-link">Results</a></li>
+          {% elif currentUser.role == "judge" %}
+          <li class="header__nav-item"><a href="/judging" class="header__nav-link">Judging</a></li>
           {% endif %}
+          <li class="header__nav-item"><a href="/gallery" class="header__nav-link">Gallery</a></li>
+          <li class="header__nav-item"><a href="/account" class="header__nav-link">Account</a></li>
           <li class="header__nav-item">
             <form method="post" action="/logout">
               <input type="hidden" name="_csrf" value="{{ csrfToken | escape }}">
@@ -40,12 +43,12 @@
   <main class="main" id="main-content">
     <div class="container">
       {% if flash %}
-      {% if flash.kind == "success" %}
-      <div class="alert alert--success" role="status" aria-live="polite">{{ flash.message | escape }}</div>
-      {% elif flash.kind == "error" %}
-      <div class="alert alert--error" role="alert" aria-live="polite">{{ flash.message | escape }}</div>
+      {% if flash.kind == "success" or flash.ok %}
+      <div class="alert alert--success" role="status" aria-live="polite">{{ (flash.message or flash.ok) | escape }}</div>
+      {% elif flash.kind == "error" or flash.err %}
+      <div class="alert alert--error" role="alert" aria-live="polite">{{ (flash.message or flash.err) | escape }}</div>
       {% else %}
-      <div class="alert alert--warning" role="status" aria-live="polite">{{ flash.message | escape }}</div>
+      <div class="alert alert--warning" role="status" aria-live="polite">{{ (flash.message) | escape }}</div>
       {% endif %}
       {% endif %}
       {% block content %}{% endblock %}

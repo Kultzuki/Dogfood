@@ -107,13 +107,24 @@ recorded inputs.
 ## Rubric versioning (organizer-configurable weights)
 
 The ballot composite is a weighted sum over the four criteria
-`technical / innovation / impact / polish`:
+`technical / innovation / impact / polish`, **computed and validated
+server-side** (`POST /api/scores`, `POST /api/scores/:id/rescore`):
 
 - An organizer publishes weights per event via
   `POST /api/events/:eventId/rubrics`; members read the active version
   via `GET /api/events/:eventId/rubric` (`drizzle/0013_rubrics.sql`).
 - Weights must use exactly those four keys, each a finite 0..100
   number, and sum to 100 — otherwise the publish is rejected with 422.
+- A judge submits `{criteria: {technical, innovation, impact, polish}}`
+  (each 0..100, else 422 `invalid_criteria`). Scalar-only submits are
+  rejected (422), and a conflicting scalar alongside criteria is rejected
+  (422 `conflicting_input`) — the server-computed composite is the only
+  accepted value. Scalar `value` persists only through seeding, migrations,
+  and the organizer import pipeline, never through judge scoring.
+  With criteria, the backend loads the active rubric, computes
+  `composite = Σ weight/100 × criterion` rounded to 2dp
+  (`compositeFor`), and persists both `criteria` JSONB and the composite
+  `value` (`drizzle/0018_score_criteria.sql`).
 - Each publish creates version `max + 1` and deactivates the previous
   version in the same transaction (advisory-locked per event), so exactly
   one version is active per event.
@@ -126,3 +137,14 @@ The ballot composite is a weighted sum over the four criteria
 - Normalization is unaffected: it operates on the stored scalar
   composites (`scores.value`), never on criteria or weights, so a
   reweight only changes subsequently submitted scores.
+
+## Finalization (persistent rankings)
+
+`POST /api/events/:eventId/finalize` (organizer-only,
+`SUBMISSIONS_CLOSED`/`JUDGING`/`RESULTS_FINAL`/`PUBLISHED`, else 422)
+runs centering over current scores and stores one
+`event_finalizations` row plus per-project `event_rankings` rows
+(`drizzle/0019_rankings.sql`). Same input re-finalizes idempotently;
+`GET /api/events/:eventId/rankings` returns the stored rows with a
+`stale` flag when scores changed since finalization (organizer always;
+others only after `RESULTS_FINAL`/`PUBLISHED`, else 404).

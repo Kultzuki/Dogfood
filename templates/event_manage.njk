@@ -2,143 +2,565 @@
 
 {% block content %}
 <div class="card page">
-  <div class="card__header">
-    <h1 class="card__title">{{ event.name }}</h1>
-    <p class="text-muted text-center">State: {{ event.state }} · Version: {{ event.version }}</p>
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a class="breadcrumb__link" href="/events">Events</a>
+    <span class="breadcrumb__separator">/</span>
+    <span class="breadcrumb__current">{{ event.name }}</span>
+    <span class="breadcrumb__separator">/</span>
+    <span class="breadcrumb__current">Manage</span>
+  </nav>
+
+  <!-- Header -->
+  <div class="card__header card__header--split">
+    <div>
+      <div class="flex items-center gap-2 mb-1 flex-wrap">
+        <h1 class="card__title card__title--left mb-0">{{ event.name }}</h1>
+        {% if event.state == "DRAFT" %}
+        <span class="badge badge--draft">{{ event.state }}</span>
+        {% elif event.state == "REGISTRATION_OPEN" %}
+        <span class="badge badge--pending">{{ event.state }}</span>
+        {% elif event.state == "SUBMISSIONS_OPEN" %}
+        <span class="badge badge--submitted">{{ event.state }}</span>
+        {% elif event.state == "SUBMISSIONS_CLOSED" %}
+        <span class="badge badge--warning">{{ event.state }}</span>
+        {% elif event.state == "JUDGING" %}
+        <span class="badge badge--scored">{{ event.state }}</span>
+        {% elif event.state == "RESULTS_FINAL" or event.state == "PUBLISHED" %}
+        <span class="badge badge--success">{{ event.state }}</span>
+        {% else %}
+        <span class="badge">{{ event.state }}</span>
+        {% endif %}
+        <span class="text-muted text-xs">v{{ event.version }}</span>
+      </div>
+      {% if event.description %}
+      <p class="text-muted mb-0">{{ event.description }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Quick Event Navigation -->
+    <div class="flex gap-2 flex-wrap">
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/judging-progress">Judging Progress</a>
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/data">Data Hub</a>
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/audit-viewer">Audit Trail</a>
+      <a class="button button--secondary button--sm" href="/gallery">Gallery</a>
+    </div>
   </div>
 
   {% if error %}
-  <div class="alert alert--error" role="alert">{{ error }}</div>
-  {% endif %}
-  {% if flash %}
-  <div class="alert alert--{{ flash.kind }}" role="status">{{ flash.message }}</div>
+  <div class="alert alert--error alert--inset" role="alert">
+    <strong>Action error:</strong> {{ error }}
+  </div>
   {% endif %}
 
-  <div class="card__body">
-    <h2>State pipeline</h2>
-    <p class="detail-meta" aria-label="Event lifecycle">
+  <!-- ── Contextual Guidance: "What do I do now?" ── -->
+  <div class="guidance-wrap">
+    <div class="guidance-card">
+      <div class="guidance-card__title">
+        <span>📍 Current Status: {{ event.state | replace("_", " ") }}</span>
+      </div>
+      <p class="guidance-card__text">{{ contextHelp.message }}</p>
+      {% if contextHelp.steps and contextHelp.steps.length > 0 %}
+      <ol class="guidance-card__steps">
+        {% for step in contextHelp.steps %}
+        <li>{{ step }}</li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Key Metrics Overview ── -->
+  <div class="metrics-wrap">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-card__value">{{ stats.teamCount }}</div>
+        <div class="stat-card__label">Teams</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ stats.projectCount }}</div>
+        <div class="stat-card__label">Projects ({{ stats.submittedCount }} submitted)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ stats.judgeCount }}</div>
+        <div class="stat-card__label">Judges</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ stats.scoreCount }}</div>
+        <div class="stat-card__label">Scores Submitted</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value text-base pt-1">
+          {% if stats.isFinalized %}
+          <span class="badge badge--success">Finalized</span>
+          {% else %}
+          <span class="badge">Unfinalized</span>
+          {% endif %}
+        </div>
+        <div class="stat-card__label">Results</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Event Setup Checklist ── -->
+  <div class="hub-section">
+    <div class="flex justify-between items-center mb-2">
+      <div>
+        <h2 class="hub-section__title mb-0">Event Setup Checklist</h2>
+        <p class="section-desc">Track setup completeness across the event lifecycle.</p>
+      </div>
+      <span class="text-muted text-sm font-semibold">
+        {{ checklistCompleted }} of {{ checklist.length }} complete
+      </span>
+    </div>
+
+    <ul class="checklist">
+      {% for item in checklist %}
+      <li class="checklist__item{% if item.done %} checklist__item--done{% endif %}">
+        <div class="checklist__status">
+          <span class="checklist__icon{% if item.done %} checklist__icon--done{% else %} checklist__icon--pending{% endif %}">
+            {% if item.done %}✓{% else %}○{% endif %}
+          </span>
+          <div>
+            <span class="checklist__label">{{ item.title }}</span>
+            <span class="checklist__desc">{{ item.description }}</span>
+          </div>
+        </div>
+        <div class="checklist__action">
+          {% if item.actionUrl %}
+          <a class="button button--secondary button--sm" href="{{ item.actionUrl }}">{{ item.actionLabel }}</a>
+          {% elif item.done %}
+          <span class="badge badge--success">Complete</span>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!-- ── Event Lifecycle State Machine ── -->
+  <div class="hub-section" id="lifecycle-section">
+    <h2 class="hub-section__title">Event Lifecycle State Machine</h2>
+    <p class="section-desc">The competition lifecycle is enforced by server-side rules. Advance the state when your event progresses to the next stage.</p>
+
+    <!-- Visual Stepper -->
+    <div class="stepper" role="navigation" aria-label="Event stages">
       {% for s in states %}
       {% if s == event.state %}
-      <span class="badge badge--scored" aria-current="step">{{ s }}</span>
+      <span class="stepper__step stepper__step--active" aria-current="step">
+        <strong>{{ s | replace("_", " ") }}</strong>
+      </span>
       {% else %}
-      <span class="badge">{{ s }}</span>
+      <span class="stepper__step">
+        {{ s | replace("_", " ") }}
+      </span>
+      {% endif %}
+      {% if not loop.last %}
+      <span class="stepper__arrow">&rarr;</span>
       {% endif %}
       {% endfor %}
-    </p>
-    <p class="form__help mt-2">Current state: {{ event.state }} · optimistic-locking version {{ event.version }}.</p>
-    {% if next and next.length > 0 %}
-    <div class="flex gap-2 mt-2">
-      {% for to in next %}
-      <form class="form form--flush" method="post" action="/events/{{ event.id }}/manage">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <input type="hidden" name="action" value="transition">
-        <input type="hidden" name="toState" value="{{ to }}">
-        <input type="hidden" name="expectedVersion" value="{{ event.version }}">
-        <button class="button button--primary button--sm" type="submit">Move to {{ to }}</button>
-      </form>
-      {% endfor %}
+    </div>
+
+    <div class="hub-card mt-3">
+      <p class="text-sm mb-2">
+        <strong>Current State:</strong> <span class="code-badge">{{ event.state }}</span> (Locking version {{ event.version }})
+      </p>
+
+      {% if next and next.length > 0 %}
+      <p class="text-sm text-muted mb-3">
+        Advance the event to the next allowed stage:
+      </p>
+      <div class="flex gap-3 flex-wrap">
+        {% for to in next %}
+        <form class="form--flush" method="post" action="/events/{{ event.id }}/manage">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="action" value="transition">
+          <input type="hidden" name="toState" value="{{ to }}">
+          <input type="hidden" name="expectedVersion" value="{{ event.version }}">
+          <button class="button button--primary button--sm" type="submit" data-confirm="Are you sure you want to transition this event to {{ to }}? This changes permissions and allowed participant/judge actions.">
+            Move to {{ to | replace("_", " ") }} &rarr;
+          </button>
+        </form>
+        {% endfor %}
+      </div>
+      {% if transitionsInfo %}
+      <div class="mt-3 text-xs text-muted">
+        {% for t in transitionsInfo %}
+        <p class="mb-1"><strong>{{ t.to }}:</strong> {{ t.explanation }}</p>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% else %}
+      <p class="text-muted text-sm mb-0">Terminal state — no further lifecycle transitions permitted.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Event Schedule ── -->
+  <div class="hub-section" id="schedule-section">
+    <h2 class="hub-section__title">Event Schedule &amp; Deadlines</h2>
+    <p class="section-desc">All deadlines and windows are strictly enforced on server clock (UTC). Submissions are accepted only during the submission window.</p>
+
+    <form class="form form--flush-x" method="post" action="/events/{{ event.id }}/manage">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="action" value="dates">
+
+      <div class="split-view mb-4">
+        <div class="split-view__pane form__group mb-0">
+          <label class="form__label" for="starts-at">
+            <strong>Event Starts</strong>
+            <span class="text-muted block text-xs font-normal">When the hackathon officially kicks off.</span>
+          </label>
+          <input class="form__input" type="datetime-local" id="starts-at" name="starts_at" value="{{ schedule.starts_at }}">
+          {% if readableSchedule.starts_at %}
+          <span class="form__help">Saved: {{ readableSchedule.starts_at }}</span>
+          {% endif %}
+        </div>
+
+        <div class="split-view__pane form__group mb-0">
+          <label class="form__label" for="ends-at">
+            <strong>Event Ends</strong>
+            <span class="text-muted block text-xs font-normal">When all hackathon activities wrap up.</span>
+          </label>
+          <input class="form__input" type="datetime-local" id="ends-at" name="ends_at" value="{{ schedule.ends_at }}">
+          {% if readableSchedule.ends_at %}
+          <span class="form__help">Saved: {{ readableSchedule.ends_at }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="split-view mb-4">
+        <div class="split-view__pane form__group mb-0">
+          <label class="form__label" for="sub-open">
+            <strong>Submissions Open</strong>
+            <span class="text-muted block text-xs font-normal">Participants can begin creating project drafts and submitting.</span>
+          </label>
+          <input class="form__input" type="datetime-local" id="sub-open" name="submissions_open_at" value="{{ schedule.submissions_open_at }}">
+          {% if readableSchedule.submissions_open_at %}
+          <span class="form__help">Saved: {{ readableSchedule.submissions_open_at }}</span>
+          {% endif %}
+        </div>
+
+        <div class="split-view__pane form__group mb-0">
+          <label class="form__label" for="sub-close">
+            <strong>Submissions Close (Hard Deadline)</strong>
+            <span class="text-muted block text-xs font-normal">After this time, projects cannot be created or edited.</span>
+          </label>
+          <input class="form__input" type="datetime-local" id="sub-close" name="submissions_close_at" value="{{ schedule.submissions_close_at }}">
+          {% if readableSchedule.submissions_close_at %}
+          <span class="form__help">Saved: {{ readableSchedule.submissions_close_at }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form__actions form__actions--start">
+        <button class="button button--primary button--sm" type="submit">Save Schedule &amp; Deadlines</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ── Tracks ── -->
+  <div class="hub-section" id="tracks-section">
+    <div class="flex justify-between items-center mb-2">
+      <div>
+        <h2 class="hub-section__title mb-0">Tracks</h2>
+        <p class="section-desc">Organize submissions into categories that judges can evaluate separately (e.g. AI/ML, Web Development, Open Innovation).</p>
+      </div>
+    </div>
+
+    {% if tracks and tracks.length > 0 %}
+    <div class="table-wrapper mb-4">
+      <table class="table">
+        <thead class="table__head">
+          <tr class="table__row">
+            <th class="table__header-cell" scope="col">Track Name</th>
+            <th class="table__header-cell" scope="col">Identifier (Slug)</th>
+            <th class="table__header-cell" scope="col">Projects</th>
+            <th class="table__header-cell" scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tracks %}
+          <tr class="table__row">
+            <td class="table__cell"><strong>{{ t.name }}</strong></td>
+            <td class="table__cell"><span class="code-badge">{{ t.slug }}</span></td>
+            <td class="table__cell">{{ t.project_count }} projects</td>
+            <td class="table__cell">
+              <form class="form--flush" method="post" action="/events/{{ event.id }}/manage">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="action" value="track_delete">
+                <input type="hidden" name="id" value="{{ t.id }}">
+                <button class="button button--danger button--sm" type="submit" data-confirm="Delete track '{{ t.name }}'?">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
     {% else %}
-    <p class="text-muted mt-2">Terminal state — no further transitions.</p>
+    <div class="empty-state">
+      <p class="empty-state__title">No tracks yet.</p>
+      <p class="empty-state__text">Tracks help organize projects into categories (e.g. AI/ML, Web3, Social Impact) so judges can evaluate them separately.</p>
+    </div>
     {% endif %}
+
+    <!-- Add Track Form -->
+    <div class="hub-card">
+      <h3 class="text-base mb-3">Add New Track</h3>
+      <form class="form form--flush" method="post" action="/events/{{ event.id }}/manage">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="action" value="track_add">
+
+        <div class="split-view">
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="track-name">Track Name</label>
+            <input class="form__input" type="text" id="track-name" name="name" required autocomplete="off" placeholder="e.g. Artificial Intelligence" data-slug-source="track-slug">
+            <span class="form__help">The human-readable title shown to participants and judges.</span>
+          </div>
+
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="track-slug">URL Slug / Identifier</label>
+            <input class="form__input" type="text" id="track-slug" name="slug" required autocomplete="off" placeholder="ai-ml">
+            <span class="form__help">Lowercase letters, numbers, and dashes (auto-filled from name).</span>
+          </div>
+        </div>
+
+        <div class="form__actions form__actions--start mt-3">
+          <button class="button button--secondary button--sm" type="submit">+ Add Track</button>
+        </div>
+      </form>
+    </div>
   </div>
 
-  <div class="card__body">
-    <h2>Tracks</h2>
-    {% if tracks and tracks.length > 0 %}
-    <ul class="flex flex-col gap-2">
-      {% for t in tracks %}
-      <li class="flex justify-between items-center gap-2">
-        <span>{{ t.slug }} — {{ t.name }}</span>
-        <form class="form--flush" method="post" action="/events/{{ event.id }}/manage">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="action" value="track_delete">
-          <input type="hidden" name="id" value="{{ t.id }}">
-          <button class="button button--danger button--sm" type="submit">Delete</button>
-        </form>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="text-muted">No tracks yet.</p>
-    {% endif %}
-    <form class="form form--flush-x" method="post" action="/events/{{ event.id }}/manage">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <input type="hidden" name="action" value="track_add">
-      <div class="form__group">
-        <label class="form__label" for="track-slug">Slug</label>
-        <input class="form__input" type="text" id="track-slug" name="slug" required autocomplete="off" placeholder="web">
-        <span class="form__help">Lowercase letters, digits, dashes (max 100).</span>
+  <!-- ── Prizes ── -->
+  <div class="hub-section" id="prizes-section">
+    <div class="flex justify-between items-center mb-2">
+      <div>
+        <h2 class="hub-section__title mb-0">Prizes</h2>
+        <p class="section-desc">Define awards and cash prizes for event-wide winners or specific track winners.</p>
       </div>
-      <div class="form__group">
-        <label class="form__label" for="track-name">Name</label>
-        <input class="form__input" type="text" id="track-name" name="name" required autocomplete="off" placeholder="Web">
-      </div>
-      <div class="form__actions">
-        <button class="button button--secondary button--sm" type="submit">Add track</button>
-      </div>
-    </form>
-  </div>
+    </div>
 
-  <div class="card__body">
-    <h2>Prizes</h2>
     {% if prizes and prizes.length > 0 %}
-    <ul class="flex flex-col gap-2">
-      {% for p in prizes %}
-      <li class="flex justify-between items-center gap-2">
-        <span>{{ p.slug }} — {{ p.name }}{% if p.amount_cents %} · {{ p.amount_cents }} cents{% endif %}</span>
-        <form class="form--flush" method="post" action="/events/{{ event.id }}/manage">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="hidden" name="action" value="prize_delete">
-          <input type="hidden" name="id" value="{{ p.id }}">
-          <button class="button button--danger button--sm" type="submit">Delete</button>
-        </form>
-      </li>
-      {% endfor %}
-    </ul>
+    <div class="table-wrapper mb-4">
+      <table class="table">
+        <thead class="table__head">
+          <tr class="table__row">
+            <th class="table__header-cell" scope="col">Prize Name</th>
+            <th class="table__header-cell" scope="col">Identifier</th>
+            <th class="table__header-cell" scope="col">Amount</th>
+            <th class="table__header-cell" scope="col">Scope</th>
+            <th class="table__header-cell" scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in prizes %}
+          <tr class="table__row">
+            <td class="table__cell"><strong>{{ p.name }}</strong></td>
+            <td class="table__cell"><span class="code-badge">{{ p.slug }}</span></td>
+            <td class="table__cell">
+              {% if p.formatted_amount %}
+              <strong>{{ p.formatted_amount }}</strong>
+              {% else %}
+              <span class="text-muted">Honorary (No cash)</span>
+              {% endif %}
+            </td>
+            <td class="table__cell">
+              {% if p.track_name %}
+              <span class="badge badge--info">Track: {{ p.track_name }}</span>
+              {% else %}
+              <span class="badge">Event-wide</span>
+              {% endif %}
+            </td>
+            <td class="table__cell">
+              <form class="form--flush" method="post" action="/events/{{ event.id }}/manage">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="action" value="prize_delete">
+                <input type="hidden" name="id" value="{{ p.id }}">
+                <button class="button button--danger button--sm" type="submit" data-confirm="Delete prize '{{ p.name }}'?">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
-    <p class="text-muted">No prizes yet.</p>
+    <div class="empty-state">
+      <p class="empty-state__title">No prizes yet.</p>
+      <p class="empty-state__text">Configure event-wide or track-specific prizes to incentivize participants and recognize top projects.</p>
+    </div>
     {% endif %}
-    <form class="form form--flush-x" method="post" action="/events/{{ event.id }}/manage">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <input type="hidden" name="action" value="prize_add">
-      <div class="form__group">
-        <label class="form__label" for="prize-slug">Slug</label>
-        <input class="form__input" type="text" id="prize-slug" name="slug" required autocomplete="off" placeholder="grand">
-      </div>
-      <div class="form__group">
-        <label class="form__label" for="prize-name">Name</label>
-        <input class="form__input" type="text" id="prize-name" name="name" required autocomplete="off" placeholder="Grand prize">
-      </div>
-      <div class="form__group">
-        <label class="form__label" for="prize-amount">Amount (cents, optional)</label>
-        <input class="form__input" type="number" id="prize-amount" name="amountCents" min="0" step="1" autocomplete="off" placeholder="50000">
-      </div>
-      <div class="form__group">
-        <label class="form__label" for="prize-track">Track ID (optional)</label>
-        <input class="form__input" type="text" id="prize-track" name="trackId" autocomplete="off" placeholder="Leave blank for event-wide">
-      </div>
-      <div class="form__actions">
-        <button class="button button--secondary button--sm" type="submit">Add prize</button>
-      </div>
-    </form>
+
+    <!-- Add Prize Form -->
+    <div class="hub-card">
+      <h3 class="text-base mb-3">Add New Prize</h3>
+      <form class="form form--flush" method="post" action="/events/{{ event.id }}/manage">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="action" value="prize_add">
+
+        <div class="split-view">
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="prize-name">Prize Name</label>
+            <input class="form__input" type="text" id="prize-name" name="name" required autocomplete="off" placeholder="e.g. Grand Prize" data-slug-source="prize-slug">
+          </div>
+
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="prize-slug">Identifier Slug</label>
+            <input class="form__input" type="text" id="prize-slug" name="slug" required autocomplete="off" placeholder="grand-prize">
+          </div>
+        </div>
+
+        <div class="split-view mt-3">
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="prize-amount">Amount (in cents, optional)</label>
+            <input class="form__input" type="number" id="prize-amount" name="amountCents" min="0" step="1" autocomplete="off" placeholder="5000000 (= ₹50,000)">
+            <span class="form__help">Enter amount in cents (e.g. 5000000 = ₹50,000, 50000 = ₹500). Leave empty for honorary.</span>
+          </div>
+
+          <div class="split-view__pane form__group mb-0">
+            <label class="form__label" for="prize-track">Track Scope</label>
+            <select class="form__input" id="prize-track" name="trackId">
+              <option value="">Event-wide (All Tracks)</option>
+              {% for t in tracks %}
+              <option value="{{ t.id }}">{{ t.name }}</option>
+              {% endfor %}
+            </select>
+            <span class="form__help">Select a specific track or make it event-wide.</span>
+          </div>
+        </div>
+
+        <div class="form__actions form__actions--start mt-3">
+          <button class="button button--secondary button--sm" type="submit">+ Add Prize</button>
+        </div>
+      </form>
+    </div>
   </div>
 
-  <div class="card__body">
-    <h2>Submission deadline</h2>
-    <p class="text-muted">Current: {% if event.submissions_close_at %}{{ event.submissions_close_at }}{% else %}open indefinitely{% endif %}. Enforced on server time.</p>
-    <form class="form form--flush-x" method="post" action="/events/{{ event.id }}/manage">
-      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <input type="hidden" name="action" value="deadline">
-      <div class="form__group">
-        <label class="form__label" for="deadline">Closes at</label>
-        <input class="form__input" type="datetime-local" id="deadline" name="submissions_close_at" value="{{ event.submissions_close_at }}">
-        <span class="form__help">Blank clears the deadline.</span>
+  <!-- ── Teams & Participants ── -->
+  <div class="hub-section" id="teams-section">
+    <div class="flex justify-between items-center mb-2">
+      <div>
+        <h2 class="hub-section__title mb-0">Teams &amp; Participants</h2>
+        <p class="section-desc">Participants form teams via invite links. Track registrations and oversee team rosters.</p>
       </div>
-      <div class="form__actions">
-        <button class="button button--secondary button--sm" type="submit">Set deadline</button>
+      <a class="button button--secondary button--sm" href="/events/{{ event.id }}/teams">Manage Teams &amp; Invite Links &rarr;</a>
+    </div>
+
+    <div class="stat-grid mb-2">
+      <div class="stat-card">
+        <div class="stat-card__value">{{ stats.teamCount }}</div>
+        <div class="stat-card__label">Registered Teams</div>
       </div>
-    </form>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ stats.teamMemberCount }}</div>
+        <div class="stat-card__label">Total Participants</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Projects & Submissions ── -->
+  <div class="hub-section" id="projects-section">
+    <div class="flex justify-between items-center mb-2">
+      <div>
+        <h2 class="hub-section__title mb-0">Projects &amp; Submissions</h2>
+        <p class="section-desc">Review submitted projects and draft submissions before judging starts.</p>
+      </div>
+      <div class="flex gap-2">
+        <a class="button button--secondary button--sm" href="/events/{{ event.id }}/projects">View All Submissions &rarr;</a>
+        <a class="button button--secondary button--sm" href="/gallery">Public Gallery</a>
+      </div>
+    </div>
+
+    <div class="stat-grid mb-2">
+      <div class="stat-card">
+        <div class="stat-card__value">{{ stats.projectCount }}</div>
+        <div class="stat-card__label">Total Projects</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ stats.submittedCount }}</div>
+        <div class="stat-card__label">Submitted (Locked)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__value">{{ stats.draftCount }}</div>
+        <div class="stat-card__label">Drafts</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Judging & Rubric ── -->
+  <div class="hub-section" id="judging-section">
+    <div class="flex justify-between items-center mb-2">
+      <div>
+        <h2 class="hub-section__title mb-0">Judging &amp; Scoring Rubric</h2>
+        <p class="section-desc">Configure weighted scoring rubrics, invite judges, and monitor progress across projects.</p>
+      </div>
+      <div class="flex gap-2">
+        <a class="button button--secondary button--sm" href="/events/{{ event.id }}/rubric">Configure Rubric</a>
+        <a class="button button--secondary button--sm" href="/events/{{ event.id }}/judges">Manage Judges</a>
+        <a class="button button--primary button--sm" href="/events/{{ event.id }}/judging-progress">Judging Progress &rarr;</a>
+      </div>
+    </div>
+
+    <div class="hub-card mt-2">
+      <div class="flex justify-between items-center mb-2">
+        <h3 class="text-base mb-0">
+          Active Scoring Rubric (Version {{ rubric.version }})
+        </h3>
+        <a class="button button--secondary button--sm" href="/events/{{ event.id }}/rubric">Edit Weights</a>
+      </div>
+      <div class="flex gap-4 flex-wrap mt-2">
+        <span>Technical Execution: <strong>{{ rubric.weights.technical }}%</strong></span>
+        <span>Innovation &amp; Creativity: <strong>{{ rubric.weights.innovation }}%</strong></span>
+        <span>Impact &amp; Value: <strong>{{ rubric.weights.impact }}%</strong></span>
+        <span>Polish &amp; Design: <strong>{{ rubric.weights.polish }}%</strong></span>
+      </div>
+      <p class="form__help mt-2">Scores submitted by judges compute this composite server-side. Criteria breakdowns are immutable once submitted.</p>
+    </div>
+  </div>
+
+  <!-- ── Results & Finalization ── -->
+  <div class="hub-section" id="results-section">
+    <div class="flex justify-between items-center mb-2">
+      <div>
+        <h2 class="hub-section__title mb-0">Results &amp; Finalization</h2>
+        <p class="section-desc">Cross-judge score normalization (centering method) balances harsh and generous judges to determine official winners.</p>
+      </div>
+      <a class="button button--primary button--sm" href="/events/{{ event.id }}/judging-progress">Scoreboard &amp; Finalize &rarr;</a>
+    </div>
+
+    <div class="hub-card mt-2">
+      {% if finalization %}
+      <p class="text-sm mb-1">
+        <strong>Finalization Status:</strong> <span class="badge badge--success">Finalized</span> (Hash: <span class="code-badge">{{ finalization.inputShort }}…</span>)
+      </p>
+      <p class="text-xs text-muted mb-0">
+        Method: {{ finalization.method }}. Ready to review rankings or advance event to PUBLISHED.
+      </p>
+      {% else %}
+      <p class="text-sm mb-1">
+        <strong>Finalization Status:</strong> <span class="badge">Pending</span>
+      </p>
+      <p class="text-xs text-muted mb-0">
+        Results can be finalized on the Judging Progress screen once scores are entered in SUBMISSIONS_CLOSED, JUDGING, or RESULTS_FINAL states.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Data Hub & Audit Trail ── -->
+  <div class="hub-section">
+    <div class="flex justify-between items-center mb-2">
+      <div>
+        <h2 class="hub-section__title mb-0">Data Hub &amp; Audit Trail</h2>
+        <p class="section-desc">Export or import CSV datasets for judging, and inspect the append-only cryptographic audit log.</p>
+      </div>
+      <div class="flex gap-2">
+        <a class="button button--secondary button--sm" href="/events/{{ event.id }}/data">Data Hub (CSV)</a>
+        <a class="button button--secondary button--sm" href="/events/{{ event.id }}/audit-viewer">Audit Trail</a>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

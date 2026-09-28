@@ -7,19 +7,49 @@
     <p class="text-muted text-center">{{ eventName }} — {{ memberCount }} of {{ maxSize }} seats filled</p>
   </div>
 
-  {% if flash %}
-  <div class="alert alert--{{ flash.kind }}" role="alert">{{ flash.message }}</div>
-  {% endif %}
+
 
   <div class="card__body">
     <h2>Roster</h2>
+    <p class="text-muted">Leader: <strong>{{ leaderName }}</strong></p>
     <ul>
       {% for m in members %}
-      <li>{{ m.name }} ({{ m.email }}) — joined {{ m.createdAt }}</li>
+      <li>{{ m.name }} ({{ m.email }}) — joined {{ m.createdAt }}{% if m.name == leaderName %} <span class="badge badge--scored">leader</span>{% endif %}</li>
       {% else %}
       <li class="text-muted">No members yet.</li>
       {% endfor %}
     </ul>
+  </div>
+
+  {% if isLeader or isOrganizer %}
+  <div class="card__body">
+    <h2>Transfer leadership</h2>
+    <form class="form" method="post" action="/events/{{ eventId }}/my-team/leader">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="form__group">
+        <label class="form__label" for="leader-select">New leader</label>
+        <select class="form__input" id="leader-select" name="leader_user_id">
+          {% for m in members %}
+          <option value="{{ m.id }}">{{ m.name }} ({{ m.email }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form__actions">
+        <button class="button button--secondary" type="submit">Transfer leadership</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="card__body">
+    <h2>Leave team</h2>
+    <p class="text-muted">Leaving is blocked while the team has a submitted project. If you are the last member, the team is dissolved. If you are the leader, leadership passes to the longest-standing member.</p>
+    <form class="form" method="post" action="/events/{{ eventId }}/my-team/leave">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="form__actions form__actions--start">
+        <button class="button button--danger" type="submit">Leave team</button>
+      </div>
+    </form>
   </div>
 
   <div class="card__body">

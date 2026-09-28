@@ -94,14 +94,14 @@ export async function registerParticipantSubmitPages(
       const up = await client.query<ProjectInfo>(
         `UPDATE projects SET status = 'submitted', updated_at = now()
           WHERE id = $1 AND status = 'draft'
-            AND (SELECT COALESCE(now() <= submissions_close_at, true) FROM events WHERE id = $2)
+            AND (SELECT ((e.submissions_open_at IS NULL OR now() >= e.submissions_open_at) AND (e.submissions_close_at IS NULL OR now() <= e.submissions_close_at)) FROM events e WHERE e.id = $2)
           RETURNING *`,
         [projectId, eventId],
       );
       const done = up.rows[0];
       if (!done) {
         const again = await client.query(
-          `SELECT status, (SELECT now() > e.submissions_close_at FROM events e WHERE e.id = $2) AS past_due
+          `SELECT status, ((SELECT e.submissions_open_at IS NOT NULL AND now() < e.submissions_open_at FROM events e WHERE e.id = $2) OR (SELECT e.submissions_close_at IS NOT NULL AND now() > e.submissions_close_at FROM events e WHERE e.id = $2)) AS past_due
              FROM projects WHERE id = $1`, [projectId, eventId],
         );
         const cur = again.rows[0] as { status: string; past_due: boolean | null } | undefined;

@@ -1,0 +1,90 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="card page">
+  <div class="card__header card__header--split">
+    <div>
+      <h1 class="card__title card__title--left mb-0">Results &amp; Rankings Hub</h1>
+      <p class="text-muted">Oversee score normalization, persistent rankings, and results publication across events.</p>
+    </div>
+    <a class="button button--secondary button--sm" href="/events">Manage Events</a>
+  </div>
+
+  <div class="card__body">
+    <div class="hub-card hub-card--flush">
+      <h2 class="text-base mb-1">Centering Score Normalization</h2>
+      <p class="text-muted text-xs mb-0">
+        Raw scores are adjusted per judge: <code>normalized = raw_score - judge_mean + global_mean</code>. This eliminates unfair advantages from lenient or harsh judges while preserving relative project evaluation. Finalization computes and cryptographically hashes the ranking input for tamper-evident reproducibility.
+      </p>
+    </div>
+
+    {% if events and events.length > 0 %}
+    <div class="event-card-list">
+      {% for e in events %}
+      <div class="event-card">
+        <div class="event-card__header">
+          <div>
+            <h3 class="text-lg mb-1">
+              <a class="event-card__title" href="/events/{{ e.id }}/judging-progress">{{ e.name }}</a>
+            </h3>
+            <div class="flex items-center gap-2">
+              <span class="badge {% if e.state == 'RESULTS_FINAL' or e.state == 'PUBLISHED' %}badge--success{% else %}badge{% endif %}">{{ e.state }}</span>
+              {% if e.is_finalized %}
+              <span class="badge badge--success">Results Finalized</span>
+              {% else %}
+              <span class="badge badge--pending">Finalization Pending</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="event-card__actions">
+            <a class="button button--primary button--sm" href="/events/{{ e.id }}/judging-progress">
+              {% if e.is_finalized %}View Rankings &rarr;{% else %}Finalize Results &rarr;{% endif %}
+            </a>
+          </div>
+        </div>
+
+        <div class="event-card__metrics">
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.submitted_count }}</span>
+            <span class="event-card__metric-lbl">Submissions</span>
+          </div>
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">{{ e.score_count }}</span>
+            <span class="event-card__metric-lbl">Scores Logged</span>
+          </div>
+          <div class="event-card__metric">
+            <span class="event-card__metric-val">
+              {% if e.is_finalized %}{{ e.ranked_count }} ranked{% else %}Not yet finalized{% endif %}
+            </span>
+            <span class="event-card__metric-lbl">Rankings Status</span>
+          </div>
+        </div>
+
+        <div class="event-card__footer">
+          <div class="event-card__dates">
+            {% if e.finalized_at %}
+            <span>Finalized: {{ e.finalized_at }}</span>
+            {% else %}
+            <span>Submissions close before finalization</span>
+            {% endif %}
+          </div>
+          <div class="flex gap-2">
+            <a class="button button--secondary button--sm" href="/events/{{ e.id }}/manage">Manage Event</a>
+            {% if e.state == "PUBLISHED" or e.state == "RESULTS_FINAL" %}
+            <a class="button button--secondary button--sm" href="/gallery">Gallery</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state__title">No events available.</p>
+      <p class="empty-state__text">Create events and gather judging scores to generate rankings and finalize results.</p>
+      <a class="button button--primary" href="/events/new">Create Event</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

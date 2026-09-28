@@ -6,7 +6,11 @@ import { describe, expect, it } from "vitest";
 import {
   COMMENTS_COLUMNS,
   EXPORT_DATASETS,
+  JUDGES_COLUMNS,
+  PROJECTS_COLUMNS,
+  TEAMS_COLUMNS,
   VOTES_COLUMNS,
+  escapeCell,
   headerFor,
 } from "./csv.js";
 
@@ -39,9 +43,45 @@ describe("T4 export datasets", () => {
       "audit",
       "votes",
       "comments",
+      "projects",
+      "teams",
+      "judges",
     ] as const) {
       expect(EXPORT_DATASETS).toContain(d);
       expect(headerFor(d).length).toBeGreaterThan(0);
     }
+  });
+  it("exposes projects, teams, and judges columns with deterministic order", () => {
+    expect([...PROJECTS_COLUMNS]).toEqual([
+      "id",
+      "event_id",
+      "team_id",
+      "track_id",
+      "title",
+      "status",
+      "created_at",
+    ]);
+    expect([...TEAMS_COLUMNS]).toEqual([
+      "id",
+      "event_id",
+      "name",
+      "max_size",
+      "leader_user_id",
+      "created_at",
+    ]);
+    expect([...JUDGES_COLUMNS]).toEqual([
+      "event_id",
+      "user_id",
+      "role",
+      "track_id",
+      "created_at",
+    ]);
+  });
+  it("escapes hostile cells (formula injection, quotes, commas, newlines)", () => {
+    expect(escapeCell("=cmd|'/c calc'!A0")).toBe("'=cmd|'/c calc'!A0");
+    expect(escapeCell('a"b')).toBe('"a""b"');
+    expect(escapeCell("a,b")).toBe('"a,b"');
+    expect(escapeCell("a\nb")).toBe('"a\nb"');
+    expect(escapeCell("plain")).toBe("plain");
   });
 });

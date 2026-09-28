@@ -11,6 +11,7 @@
 import fp from "fastify-plugin";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import "@fastify/view";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -91,6 +92,18 @@ async function csrfPlugin(app: FastifyInstance): Promise<void> {
       }
 
       if (!sessionToken || !submittedToken || !tokensEqual(submittedToken, sessionToken)) {
+        const contentType = String(req.headers["content-type"] ?? "");
+        const urlPath = (req.url ?? "").split("?")[0];
+        if (
+          contentType.includes("application/x-www-form-urlencoded") &&
+          (urlPath === "/login" || urlPath === "/")
+        ) {
+          const freshToken = req.csrfToken();
+          return reply.code(403).view("login.njk", {
+            csrfToken: freshToken,
+            error: "Security token expired or invalid. Please refresh the page and try again.",
+          });
+        }
         // Sending a response in a hook terminates the request lifecycle;
         // the route handler is never reached.
         return reply.code(403).type("application/json").send({
